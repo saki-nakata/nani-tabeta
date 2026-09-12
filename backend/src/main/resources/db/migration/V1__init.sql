@@ -65,7 +65,8 @@ CREATE TABLE shops (
   PRIMARY KEY (id),
   CONSTRAINT uk_shops_name_area UNIQUE (shop_name, area_id),
   CONSTRAINT fk_shops_area FOREIGN KEY (area_id)      REFERENCES areas(id),
-  CONSTRAINT fk_shops_kind FOREIGN KEY (shop_kind_id) REFERENCES shop_kinds(id)
+  CONSTRAINT fk_shops_kind FOREIGN KEY (shop_kind_id) REFERENCES shop_kinds(id),
+  CONSTRAINT chk_shops_is_closed CHECK (is_closed IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 商品
@@ -80,7 +81,8 @@ CREATE TABLE items (
   PRIMARY KEY (id),
   CONSTRAINT uk_items_shop_name UNIQUE (shop_id, item_name),
   CONSTRAINT fk_items_shop FOREIGN KEY (shop_id) REFERENCES shops(id),
-  CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES categories(id)
+  CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES categories(id),
+  CONSTRAINT chk_items_is_seasonal CHECK (is_seasonal IN (0, 1))
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 記録
@@ -107,10 +109,11 @@ CREATE TABLE items (
 CREATE TABLE record_photos (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   record_id BIGINT UNSIGNED NOT NULL,
-  photo_url VARCHAR(500) NOT NULL,
+  photo_path VARCHAR(500) NOT NULL,
   sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY(id),
+  CONSTRAINT uk_record_photos_order UNIQUE (record_id, sort_order),
   CONSTRAINT fk_record_photos_record FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -119,7 +122,7 @@ CREATE TABLE shop_photos (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   shop_id       BIGINT UNSIGNED NOT NULL,
   user_id       CHAR(36)        NOT NULL,
-  photo_url     VARCHAR(500)    NOT NULL,
+  photo_path     VARCHAR(500)    NOT NULL,
   photo_type    VARCHAR(10)     NOT NULL COMMENT 'menu / shopfront',
   taken_on      DATE            NOT NULL COMMENT '撮影日',
   created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,

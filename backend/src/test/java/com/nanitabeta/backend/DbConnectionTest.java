@@ -22,4 +22,18 @@ class DbConnectionTest {
             assertThat(version).startsWith("8.4");
         }
     }
+
+    @Test
+    void DBのタイムゾーンが日本時間になっている() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.createStatement();
+             var rs = statement.executeQuery(
+                 "SELECT @@session.time_zone, NOW(), TIMEDIFF(NOW(), UTC_TIMESTAMP())")) {
+            rs.next();
+            System.out.println("session.time_zone = " + rs.getString(1));
+            System.out.println("NOW() = " + rs.getString(2));
+            assertThat(rs.getString(3)).isEqualTo("09:00:00");
+        }
+    }
+
 }
