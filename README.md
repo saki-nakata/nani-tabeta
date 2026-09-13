@@ -5,12 +5,13 @@
 
 ## 開発状況
 
-設計と環境構築が完了し、これから実装に入ります。
+設計・環境構築・DB構築が完了し、これからバックエンドの実装に入ります。
 
 - [x] 要件定義
 - [x] ER図・テーブル設計
 - [x] 技術選定
 - [x] 環境構築（Spring Boot / MySQL / Next.js）
+- [x] DB設計・マイグレーション
 - [ ] バックエンド実装
 - [ ] フロントエンド実装
 - [ ] デプロイ
@@ -22,7 +23,7 @@
 | 領域 | 技術 |
 |---|---|
 | フロントエンド | Next.js 16.3.4 (App Router) / React 19.2.8 / TypeScript 5.9 / Tailwind CSS v4 |
-| バックエンド | Java 25 / Spring Boot 4.0.8 / MyBatis |
+| バックエンド | Java 25 / Spring Boot 4.0.8 / MyBatis / Flyway |
 | データベース | MySQL 8.4（Docker Compose）|
 
 ### 今後実装
@@ -89,6 +90,10 @@ cd backend
 .\gradlew bootRun     # http://localhost:8080
 ```
 
+**テーブルの作成は不要です。** 起動時に Flyway が
+`backend/src/main/resources/db/migration/` の SQL を自動で適用し、
+テーブルとマスタデータ（地域・エリア・分類・業態）を作ります。
+
 ### 5. フロントエンドを起動する
 
 ```powershell
@@ -109,6 +114,47 @@ pnpm dev              # http://localhost:3000
 | フロントエンドの起動 | `pnpm dev` | `frontend` |
 | 静的検査 | `pnpm lint` | `frontend` |
 | 本番ビルドの確認 | `pnpm build` | `frontend` |
+
+## データベース
+
+スキーマの変更は **Flyway** で管理します。SQL はこの場所に置きます。
+
+```
+backend/src/main/resources/db/migration/
+├── V1__init.sql          テーブル定義（12テーブル）
+└── V2__master_data.sql   マスタの初期データ
+```
+
+| 決まりごと | 内容 |
+|---|---|
+| ファイル名 | `V<番号>__<説明>.sql`（**アンダースコアは2つ**）|
+| 適用 | アプリの起動時に、未適用のものが番号順に実行される |
+| 記録 | `flyway_schema_history` テーブルに適用状況が残る |
+
+### 既存ファイルを編集してよい条件
+
+Flyway は適用済みファイルの内容を照合値で検証するため、変更するとアプリが起動しなくなります。
+
+```
+Migration checksum mismatch for migration version 1
+```
+
+そのため、**既存ファイルの編集は次の条件を両方満たす場合に限ります。**
+
+- `main` にマージしていない
+- 適用済みの開発用DBを `docker compose down -v` で破棄できる
+
+この条件を満たす間は、`V1` を直接編集して作り直すほうが、履歴が読みやすくなります。
+
+```powershell
+docker compose down -v   # データと適用履歴をまとめて削除する
+docker compose up -d
+cd backend
+.\gradlew bootRun        # V1 から再適用される
+```
+
+**`main` にマージした後は、既存ファイルを変更せず、`V3__xxx.sql` のように追加します。**
+他の環境（本番を含む）に適用済みのファイルは、もう書き換えられないためです。
 
 ## 注意
 
