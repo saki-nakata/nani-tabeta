@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nanitabeta.backend.repository.ShopKindRepository">
+
+  <!-- 業態の一覧 -->
+  <select id="searchShopKindList" resultType="com.nanitabeta.backend.data.ShopKind">
+    SELECT id, shop_kind_name, shop_kind_emoji
+    FROM shop_kinds
+    ORDER BY id
+  </select>
+
+</mapper>

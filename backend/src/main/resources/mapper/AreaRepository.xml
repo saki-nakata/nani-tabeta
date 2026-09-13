@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nanitabeta.backend.repository.AreaRepository">
+
+  <!-- 地域の一覧 -->
+  <select id="searchRegionList" resultType="com.nanitabeta.backend.data.Region">
+    SELECT id, region_name
+    FROM regions
+    ORDER BY id
+  </select>
+
+ <!-- エリアの一覧 -->
+  <select id="searchAreaList" resultType="com.nanitabeta.backend.data.Area">
+    SELECT id, region_id, area_name
+    FROM areas
+    ORDER BY id
+  </select>
+
+</mapper>
