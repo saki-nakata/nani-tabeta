@@ -11,6 +11,9 @@ spring:
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
 
+springdoc:
+  default-produces-media-type: application/json
+
 mybatis:
   mapper-locations: classpath*:/mapper/*.xml     # XML
   configuration:
