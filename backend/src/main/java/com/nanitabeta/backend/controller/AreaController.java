@@ -18,22 +18,22 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "エリアマスタ", description = "地域とエリアを扱う REST API")
 @RestController
 public class AreaController {
-    private AreaService service;
 
-    @Autowired
-    public AreaController(AreaService service) {
-      this.service = service;
-    }
+  private AreaService service;
 
-    /**
-     * 地域ごとにエリアをまとめた一覧を取得します。
-     *
-     * @return 地域詳細の一覧
-     */
-    @Operation(summary = "エリアの一覧取得", description = "地域ごとにエリアをまとめた一覧を、地域・エリアとも id の昇順で取得します。")
-    @GetMapping("/api/areas")
-    public List<RegionDetail> searchRegionDetailList(){
-        return service.searchRegionDetailList();
-    }
+  @Autowired
+  public AreaController(AreaService service) {
+    this.service = service;
+  }
 
+  /**
+   * 地域ごとにエリアをまとめた一覧を取得します。
+   *
+   * @return 地域詳細の一覧
+   */
+  @Operation(summary = "エリアの一覧取得", description = "地域ごとにエリアをまとめた一覧を、地域・エリアとも id の昇順で取得します。")
+  @GetMapping("/api/areas")
+  public List<RegionDetail> searchRegionDetailList() {
+    return service.searchRegionDetailList();
+  }
 }
