@@ -82,11 +82,14 @@ docker compose ps
 
 `STATUS` が `Up (healthy)` になるまで30秒ほどかかります。
 
+初めて起動したときは、開発用の `nani_tabeta` に加えて、テスト用の `nani_tabeta_test` も自動で作られます。
+以前からこのリポジトリで MySQL を使っていた場合は、[テスト用データベース](#テスト用データベース) の手順で追加してください。
+
 ### 4. バックエンドを起動する
 
 ```powershell
 cd backend
-.\gradlew test        # DB に接続できるか確認する
+.\gradlew test        # テスト用DB（nani_tabeta_test）で実行する
 .\gradlew bootRun     # http://localhost:8080
 ```
 
@@ -109,6 +112,7 @@ pnpm dev              # http://localhost:3000
 | MySQL の起動 | `docker compose up -d` | ルート |
 | MySQL の停止 | `docker compose down` | ルート |
 | MySQL に接続 | `docker compose exec db mysql -u nani_tabeta -p nani_tabeta` | ルート |
+| テスト用DBに接続 | `docker compose exec db mysql -u nani_tabeta -p nani_tabeta_test` | ルート |
 | バックエンドのテスト | `.\gradlew test` | `backend` |
 | バックエンドの起動 | `.\gradlew bootRun` | `backend` |
 | フロントエンドの起動 | `pnpm dev` | `frontend` |
@@ -155,6 +159,38 @@ cd backend
 
 **`main` にマージした後は、既存ファイルを変更せず、`V3__xxx.sql` のように追加します。**
 他の環境（本番を含む）に適用済みのファイルは、もう書き換えられないためです。
+
+### テスト用データベース
+
+テストは開発用の `nani_tabeta` ではなく、**テスト専用の `nani_tabeta_test`** に接続します。
+開発中に登録したデータでテストの結果が変わったり、テストが開発用のデータを書き換えたりしないようにするためです。
+
+| 項目 | 内容 |
+|---|---|
+| 接続先の切り替え | `backend/src/test/resources/application-test.yaml` で接続先の URL だけを上書きする |
+| 切り替えの有効化 | `backend/build.gradle` の `test` タスクで `spring.profiles.active=test` を指定する（テストクラスごとの指定は不要）|
+| テーブルとマスタデータ | テストの実行時に Flyway が `V1`・`V2` を適用する（テスト専用の `schema.sql` や `data.sql` は置かない）|
+| DB の作成 | `docker/mysql/init/01_create_test_database.sql` |
+
+#### 新しく clone した場合
+
+追加の作業はありません。`docker compose up -d` を初めて実行したときに、
+`docker/mysql/init/` の SQL が自動で実行され、`nani_tabeta_test` の作成と権限の付与が行われます。
+
+#### すでに MySQL のボリュームがある場合
+
+`docker/mysql/init/` の SQL は、**データの保存先（ボリューム）が空のときの初回起動時にしか実行されません。**
+以前から MySQL を使っていた環境では自動で作られないため、次のコマンドで一度だけ作成します。
+
+```powershell
+docker compose up -d
+Get-Content docker/mysql/init/01_create_test_database.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"'
+```
+
+`Using a password on the command line interface can be insecure.` という警告だけが表示されれば成功です。
+SQL は `IF NOT EXISTS` 付きなので、何度実行しても問題ありません。
+
+> `docker compose down -v` でボリュームを作り直す方法でも作られますが、開発用のデータもすべて消えます。
 
 ## 注意
 

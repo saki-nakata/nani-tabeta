@@ -1,0 +1,3 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/nani_tabeta_test?connectionTimeZone=Asia/Tokyo&forceConnectionTimeZoneToSession=true
