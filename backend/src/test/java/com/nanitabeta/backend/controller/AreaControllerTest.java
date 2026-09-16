@@ -21,6 +21,7 @@ import com.nanitabeta.backend.data.Region;                // javax.swing の Reg
 import com.nanitabeta.backend.domain.RegionDetail;
 import com.nanitabeta.backend.service.AreaService;
 
+
 @WebMvcTest(AreaController.class)
 class AreaControllerTest {
 
