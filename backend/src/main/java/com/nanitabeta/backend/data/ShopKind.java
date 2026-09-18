@@ -18,12 +18,12 @@ import lombok.Setter;
 @EqualsAndHashCode
 public class ShopKind {
 
-    @Schema(description = "業態ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long id;
+  @Schema(description = "業態ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+  private Long id;
 
-    @Schema(description = "業態名", example = "コンビニ", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String shopKindName;
+  @Schema(description = "業態名", example = "コンビニ", requiredMode = Schema.RequiredMode.REQUIRED)
+  private String shopKindName;
 
-    @Schema(description = "業態の絵文字", example = "🏪", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String shopKindEmoji;
+  @Schema(description = "業態の絵文字", example = "🏪", requiredMode = Schema.RequiredMode.REQUIRED)
+  private String shopKindEmoji;
 }
