@@ -1,10 +1,8 @@
 package com.nanitabeta.backend.domain;
 
 import java.util.List;
-
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

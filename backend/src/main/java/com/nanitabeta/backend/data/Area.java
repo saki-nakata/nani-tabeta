@@ -18,12 +18,12 @@ import lombok.Setter;
 @EqualsAndHashCode
 public class Area {
 
-    @Schema(description = "エリアID", example = "13", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long id;
+  @Schema(description = "エリアID", example = "13", requiredMode = Schema.RequiredMode.REQUIRED)
+  private Long id;
 
-    @Schema(description = "所属する地域のID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long regionId;
+  @Schema(description = "所属する地域のID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
+  private Long regionId;
 
-    @Schema(description = "エリア名", example = "東京都", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String areaName;
+  @Schema(description = "エリア名", example = "東京都", requiredMode = Schema.RequiredMode.REQUIRED)
+  private String areaName;
 }

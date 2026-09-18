@@ -18,9 +18,9 @@ import lombok.Setter;
 @EqualsAndHashCode
 public class Region {
 
-    @Schema(description = "地域ID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
-    private Long id;
+  @Schema(description = "地域ID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
+  private Long id;
 
-    @Schema(description = "地域名", example = "関東", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String regionName;
+  @Schema(description = "地域名", example = "関東", requiredMode = Schema.RequiredMode.REQUIRED)
+  private String regionName;
 }
