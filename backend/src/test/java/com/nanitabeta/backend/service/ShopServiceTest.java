@@ -3,11 +3,15 @@ package com.nanitabeta.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -95,5 +99,43 @@ class ShopServiceTest {
     sut.registerShop(shop);
 
     assertThat(shop.getShopName()).isEqualTo("スターバックス");
+  }
+
+  @Test
+  void 店の候補_リポジトリの結果をそのまま返すこと() {
+    List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
+    when(repository.searchShopSuggestions(any(), any(), anyInt())).thenReturn(expected);
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "スター");
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 店の候補_キーワードを正規化してから渡すこと() {
+    sut.searchShopSuggestions(20L, "　スター　バックス　"); // 前後と途中に全角スペース
+
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), anyInt());
+  }
+
+  @Test
+  void 店の候補_キーワードのワイルドカードをエスケープすること() {
+    sut.searchShopSuggestions(20L, "100%_OFF");
+
+    verify(repository).searchShopSuggestions(eq(20L), eq("100\\%\\_OFF"), anyInt());
+  }
+
+  @Test
+  void 店の候補_件数の上限を10件として渡すこと() {
+    sut.searchShopSuggestions(20L, "スター");
+
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq(10));
+  }
+
+  @Test
+  void 店の候補_キーワードが未指定の場合はnullのまま渡すこと() {
+    sut.searchShopSuggestions(20L, null);
+
+    verify(repository).searchShopSuggestions(eq(20L), isNull(), anyInt());
   }
 }

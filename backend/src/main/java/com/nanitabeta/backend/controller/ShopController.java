@@ -1,5 +1,6 @@
 package com.nanitabeta.backend.controller;
 
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.nanitabeta.backend.controller.request.ShopCreateRequest;
 import com.nanitabeta.backend.data.Shop;
@@ -69,5 +71,24 @@ public class ShopController {
       return ResponseEntity.status(HttpStatus.OK).body(shopRegistration.getShop());
     }
     return ResponseEntity.status(HttpStatus.CREATED).body(shopRegistration.getShop());
+  }
+
+  /**
+   * 店の登録時に表示する候補を取得します。
+   * <p>
+   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
+   *
+   * @param areaId エリアID
+   * @param keyword 店名の一部（省略した場合は絞り込まない）
+   * @return 店の一覧
+   */
+  @Operation(summary = "店の候補の取得", description = "エリア内の店を候補として取得します。閉店した店は含みません。")
+  @ApiResponse(responseCode = "200", description = "取得成功")
+  @ApiResponse(responseCode = "400", description = "エリアIDが指定されていない",
+      content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
+  @GetMapping("/api/shops/suggestions")
+  public List<Shop> searchShopSuggestions(@RequestParam Long areaId,
+      @RequestParam(required = false) String keyword) {
+    return service.searchShopSuggestions(areaId, keyword);
   }
 }

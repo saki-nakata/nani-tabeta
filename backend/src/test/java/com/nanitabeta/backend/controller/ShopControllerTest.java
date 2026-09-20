@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -87,4 +88,39 @@ class ShopControllerTest {
     verify(service, never()).registerShop(any());
   }
 
+  @Test
+  void 店の候補の取得_店の一覧がJSONで返ること() throws Exception {
+    when(service.searchShopSuggestions(20L, "スター"))
+        .thenReturn(List.of(new Shop(1L, "スターバックス", 20L, 9L, false)));
+
+    mockMvc.perform(get("/api/shops/suggestions").param("areaId", "20").param("keyword", "スター"))
+        .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().json("""
+            [{"id": 1, "shopName": "スターバックス", "areaId": 20, "shopKindId": 9, "isClosed": false}]
+            """));
+
+    verify(service).searchShopSuggestions(20L, "スター");
+  }
+
+  @Test
+  void 店の候補の取得_エリアIDがない場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/shops/suggestions")).andExpect(status().isBadRequest())
+        .andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "リクエストのパラメータが正しくありません。"}
+            """));
+
+    verify(service, never()).searchShopSuggestions(any(), any());
+  }
+
+  @Test
+  void 店の取得_IDが数値でない場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/shops/abc")).andExpect(status().isBadRequest())
+        .andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "リクエストのパラメータが正しくありません。"}
+            """));
+
+    verify(service, never()).searchShop(any());
+  }
 }
