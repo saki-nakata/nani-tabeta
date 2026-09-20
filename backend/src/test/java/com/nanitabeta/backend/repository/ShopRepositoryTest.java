@@ -129,4 +129,20 @@ class ShopRepositoryTest {
 
     assertThat(actual).hasSize(1);
   }
+
+  @Test
+  @Sql("/sql/insert-shops-with-wildcards.sql")
+  void 店の候補_エスケープ済みのキーワードはワイルドカードとして扱われないこと() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, "100\\%\\_OFF", 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("100%_OFF");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-with-wildcards.sql")
+  void 店の候補_エスケープしないキーワードはワイルドカードとして扱われること() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, "100%_OFF", 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("100%_OFF", "100XYOFF");
+  }
 }

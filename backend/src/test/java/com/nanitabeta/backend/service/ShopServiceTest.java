@@ -126,6 +126,13 @@ class ShopServiceTest {
   }
 
   @Test
+  void 店の候補_件数の上限を10件として渡すこと() {
+    sut.searchShopSuggestions(20L, "スター");
+
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq(10));
+  }
+
+  @Test
   void 店の候補_キーワードが未指定の場合はnullのまま渡すこと() {
     sut.searchShopSuggestions(20L, null);
 

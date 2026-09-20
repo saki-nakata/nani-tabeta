@@ -18,7 +18,7 @@ import com.nanitabeta.backend.util.NameNormalizer;
 public class ShopService {
 
   /** 店の候補として返す最大件数 */
-  private static final int SUGGESTION_LIMIT = 15;
+  private static final int SUGGESTION_LIMIT = 10;
 
   private ShopRepository repository;
 
