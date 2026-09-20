@@ -111,13 +111,37 @@ pnpm dev              # http://localhost:3000
 |---|---|---|
 | MySQL の起動 | `docker compose up -d` | ルート |
 | MySQL の停止 | `docker compose down` | ルート |
-| MySQL に接続 | `docker compose exec db mysql -u nani_tabeta -p nani_tabeta` | ルート |
-| テスト用DBに接続 | `docker compose exec db mysql -u nani_tabeta -p nani_tabeta_test` | ルート |
+| MySQL に接続 | `docker compose exec db mysql --default-character-set=utf8mb4 -u nani_tabeta -p nani_tabeta` | ルート |
+| テスト用DBに接続 | `docker compose exec db mysql --default-character-set=utf8mb4 -u nani_tabeta -p nani_tabeta_test` | ルート |
 | バックエンドのテスト | `.\gradlew test` | `backend` |
 | バックエンドの起動 | `.\gradlew bootRun` | `backend` |
 | フロントエンドの起動 | `pnpm dev` | `frontend` |
 | 静的検査 | `pnpm lint` | `frontend` |
 | 本番ビルドの確認 | `pnpm build` | `frontend` |
+
+### MySQL に接続するときの注意（Windows）
+
+**`--default-character-set=utf8mb4` を付ける。** 付けないと接続の文字コードが `latin1` になり、
+`COLLATION 'utf8mb4_0900_ai_ci' is not valid for CHARACTER SET 'latin1'` というエラーになります。
+
+**引用符を入れ子にしない。** `sh -c '...'` の中に `-e "..."` を書くと、PowerShell から渡す
+途中で内側の `"` が失われ、SQL が空白で分割されて構文エラーになります。
+
+```powershell
+# NG: sh -c の中に -e "..." を入れ子にすると壊れる
+docker compose exec db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" nani_tabeta -e "INSERT INTO ...;"'
+
+# OK: docker に直接渡す（SQL は1つの引数として届く）
+docker compose exec db mysql --default-character-set=utf8mb4 -u nani_tabeta -p nani_tabeta -e "SELECT * FROM shops;"
+
+# OK: mysql に入ってから SQL を実行する（複数の SQL を続けて書くときはこちら）
+docker compose exec db mysql --default-character-set=utf8mb4 -u nani_tabeta -p nani_tabeta
+```
+
+SQL の中の文字列はシングルクォート（`'パン工房'`）で囲みます。
+
+**日本語を貼り付ける場合は、先に `chcp 65001` を実行する。** コンソールの文字コードが
+UTF-8 でないと、日本語が `?` や空文字になったまま登録されます。
 
 ## データベース
 
@@ -125,8 +149,9 @@ pnpm dev              # http://localhost:3000
 
 ```
 backend/src/main/resources/db/migration/
-├── V1__init.sql          テーブル定義（12テーブル）
-└── V2__master_data.sql   マスタの初期データ
+├── V1__init.sql                              テーブル定義（12テーブル）
+├── V2__master_data.sql                       マスタの初期データ
+└── V3__use_japanese_collation_for_names.sql  店名・商品名の照合順序
 ```
 
 | 決まりごと | 内容 |
@@ -184,7 +209,7 @@ cd backend
 
 ```powershell
 docker compose up -d
-Get-Content docker/mysql/init/01_create_test_database.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"'
+Get-Content docker/mysql/init/01_create_test_database.sql | docker compose exec -T db sh -c 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD"'
 ```
 
 `Using a password on the command line interface can be insecure.` という警告だけが表示されれば成功です。
