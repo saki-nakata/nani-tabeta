@@ -1,6 +1,8 @@
 package com.nanitabeta.backend.repository;
 
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import com.nanitabeta.backend.data.Shop;
 
 /**
@@ -44,4 +46,19 @@ public interface ShopRepository {
    * @return 店（見つからない場合は null）
    */
   Shop searchShopByNameAndAreaForShare(Shop shop);
+
+  /**
+   * エリア内の店を、店の登録時の候補として取得します。
+   * <p>
+   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
+   * <p>
+   * キーワードの比較は濁点と大文字小文字を区別しません（取りこぼしを避けるため）。
+   *
+   * @param areaId エリアID
+   * @param keyword 店名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
+   * @param limit 取得する最大件数
+   * @return 店の一覧（該当がない場合は空のリスト）
+   */
+  List<Shop> searchShopSuggestions(@Param("areaId") Long areaId, @Param("keyword") String keyword,
+      @Param("limit") int limit);
 }

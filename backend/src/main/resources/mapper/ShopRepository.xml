@@ -31,4 +31,17 @@
     VALUES (#{shopName}, #{areaId}, #{shopKindId})
   </insert>
 
+  <!-- エリア内の店の候補（閉店を除く。キーワードは濁点・大文字小文字を区別せずに部分一致） -->
+  <select id="searchShopSuggestions" resultType="com.nanitabeta.backend.data.Shop">
+    SELECT id, shop_name, area_id, shop_kind_id, is_closed
+    FROM shops
+    WHERE area_id = #{areaId}
+      AND is_closed = FALSE
+    <if test="keyword != null and keyword != ''">
+      AND shop_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{keyword}, '%')
+    </if>
+    ORDER BY shop_name
+    LIMIT #{limit}
+  </select>
+
 </mapper>

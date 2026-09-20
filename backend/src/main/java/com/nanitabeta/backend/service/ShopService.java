@@ -1,5 +1,6 @@
 package com.nanitabeta.backend.service;
 
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,9 @@ import com.nanitabeta.backend.util.NameNormalizer;
  */
 @Service
 public class ShopService {
+
+  /** 店の候補として返す最大件数 */
+  private static final int SUGGESTION_LIMIT = 15;
 
   private ShopRepository repository;
 
@@ -64,5 +68,32 @@ public class ShopService {
     }
     Shop registerShop = repository.searchShop(shop.getId());
     return new ShopRegistration(registerShop, true);
+  }
+
+  /**
+   * 店の登録時に表示する候補を取得します。
+   * <p>
+   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
+   *
+   * @param areaId エリアID
+   * @param keyword 店名の一部（null または空文字の場合は絞り込まない）
+   * @return 店の一覧（該当がない場合は空のリスト）
+   */
+  public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
+    String condition = null;
+    if (keyword != null) {
+      condition = escapeForLike(NameNormalizer.normalize(keyword));
+    }
+    return repository.searchShopSuggestions(areaId, condition, SUGGESTION_LIMIT);
+  }
+
+  /**
+   * LIKE のワイルドカードとして解釈される文字を、ただの文字として扱えるようにします。
+   *
+   * @param keyword キーワード
+   * @return エスケープ後のキーワード
+   */
+  private String escapeForLike(String keyword) {
+    return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 }

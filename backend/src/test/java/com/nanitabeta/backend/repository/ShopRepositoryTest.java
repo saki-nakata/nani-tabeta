@@ -1,6 +1,7 @@
 package com.nanitabeta.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,5 +87,46 @@ class ShopRepositoryTest {
     Shop actual = sut.searchShopByNameAndAreaForShare(shop);
 
     assertThat(actual.getId()).isEqualTo(1L);
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 店の候補_エリア内の閉店していない店を店名順で取得できること() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, null, 20);
+
+    assertThat(actual).extracting(Shop::getShopName)
+        .containsExactly("スターバックス", "セブンイレブン");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 店の候補_キーワードで部分一致の絞り込みができること() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, "セブン", 20);
+
+    assertThat(actual).extracting(Shop::getId).containsExactly(2L);
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 店の候補_キーワードは濁点と大文字小文字を区別しないこと() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, "スターパックス", 20);
+
+    assertThat(actual).extracting(Shop::getId).containsExactly(1L);
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 店の候補_該当がない場合は空のリストを返すこと() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, "ローソン", 20);
+
+    assertThat(actual).isEmpty();
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 店の候補_件数の上限を超えないこと() {
+    List<Shop> actual = sut.searchShopSuggestions(20L, null, 1);
+
+    assertThat(actual).hasSize(1);
   }
 }
