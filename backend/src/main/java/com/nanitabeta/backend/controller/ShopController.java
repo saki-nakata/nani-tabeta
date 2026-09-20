@@ -1,10 +1,16 @@
 package com.nanitabeta.backend.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import com.nanitabeta.backend.controller.request.ShopCreateRequest;
 import com.nanitabeta.backend.data.Shop;
+import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.ErrorMessage;
 import com.nanitabeta.backend.service.ShopService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 /**
  * 店を扱う REST API です。
@@ -40,5 +47,27 @@ public class ShopController {
   @GetMapping("/api/shops/{id}")
   public Shop searchShop(@PathVariable Long id) {
     return service.searchShop(id);
+  }
+
+  /**
+   * 店を登録します。
+   * <p>
+   * 同じ店名とエリアの店がすでにある場合は、新しく作らずにその店を返します。
+   *
+   * @param request 店の登録内容
+   * @return 新しく作った場合は 201、既存の店を使った場合は 200 と店
+   */
+  @Operation(summary = "店の登録", description = "店を登録します。同じ店名とエリアの店があれば、その店を返します。")
+  @ApiResponse(responseCode = "201", description = "新しく登録した")
+  @ApiResponse(responseCode = "200", description = "既存の店を使った")
+  @ApiResponse(responseCode = "400", description = "入力内容に誤りがある",
+      content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
+  @PostMapping("/api/shops")
+  public ResponseEntity<Shop> registerShop(@RequestBody @Valid ShopCreateRequest request) {
+    ShopRegistration shopRegistration = service.registerShop(request.toShop());
+    if (!shopRegistration.isCreated()) {
+      return ResponseEntity.status(HttpStatus.OK).body(shopRegistration.getShop());
+    }
+    return ResponseEntity.status(HttpStatus.CREATED).body(shopRegistration.getShop());
   }
 }
