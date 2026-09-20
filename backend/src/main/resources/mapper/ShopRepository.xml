@@ -10,4 +10,25 @@
     WHERE id = #{id}
   </select>
 
+  <!-- 店名とエリアで店を取得 -->
+  <select id="searchShopByNameAndArea" resultType="com.nanitabeta.backend.data.Shop">
+    SELECT id, shop_name, area_id, shop_kind_id, is_closed
+    FROM shops
+    WHERE shop_name = #{shopName} AND area_id = #{areaId}
+  </select>
+
+  <!-- 店名とエリアで店を取得（行ロックを取り、最新の確定データを読む） -->
+  <select id="searchShopByNameAndAreaForShare" resultType="com.nanitabeta.backend.data.Shop">
+    SELECT id, shop_name, area_id, shop_kind_id, is_closed
+    FROM shops
+    WHERE shop_name = #{shopName} AND area_id = #{areaId}
+    FOR SHARE
+  </select>
+
+  <!-- 店の登録 -->
+  <insert id="insertShop" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO shops (shop_name, area_id, shop_kind_id)
+    VALUES (#{shopName}, #{areaId}, #{shopKindId})
+  </insert>
+
 </mapper>

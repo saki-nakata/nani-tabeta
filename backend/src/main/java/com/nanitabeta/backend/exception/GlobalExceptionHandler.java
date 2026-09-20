@@ -1,7 +1,10 @@
 package com.nanitabeta.backend.exception;
 
+import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +15,37 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  /**
+   * 入力内容に誤りがある場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<ErrorMessage> handleValidationError(MethodArgumentNotValidException ex) {
+    String message = ex.getBindingResult().getFieldErrors().stream()
+        .map(error -> error.getDefaultMessage()).collect(Collectors.joining(" "));
+
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), message);
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 指定されたエリアや業態が存在しないなど、DBの制約に反する場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  public ResponseEntity<ErrorMessage> handleDataIntegrityViolation(
+      DataIntegrityViolationException ex) {
+    log.warn("DBの制約に反する操作が行われました", ex);
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), "指定されたエリアまたは業態が存在しません。");
+    return ResponseEntity.status(status).body(error);
+  }
 
   /**
    * 指定されたデータが見つからない場合の例外を処理します。
