@@ -5,8 +5,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -44,6 +46,21 @@ public class GlobalExceptionHandler {
     log.warn("DBの制約に反する操作が行われました", ex);
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), "指定されたエリアまたは業態が存在しません。");
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * リクエストのパラメータが足りない場合や、型が合わない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler({MissingServletRequestParameterException.class,
+      MethodArgumentTypeMismatchException.class})
+  public ResponseEntity<ErrorMessage> handleInvalidParameter(Exception ex) {
+    log.warn("リクエストのパラメータが正しくありません", ex);
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), "リクエストのパラメータが正しくありません。");
     return ResponseEntity.status(status).body(error);
   }
 
