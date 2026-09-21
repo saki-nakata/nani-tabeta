@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
+import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 import com.nanitabeta.backend.util.NameNormalizer;
@@ -68,6 +69,28 @@ public class ShopService {
     }
     Shop registerShop = repository.searchShop(shop.getId());
     return new ShopRegistration(registerShop, true);
+  }
+
+  /**
+   * 店を更新します。
+   * <p>
+   * 店名は正規化してから保存します。変更後の店名とエリアが他の店と重複する場合は、 DuplicateShopNameException が発生します。
+   *
+   * @param shop 更新する店
+   * @return 更新後の店
+   * @throws ResourceNotFoundException 店が見つからない場合
+   * @throws DuplicateShopNameException 店名とエリアが他の店と重複する場合
+   */
+  @Transactional
+  public Shop updateShop(Shop shop) {
+    searchShop(shop.getId()); // 存在しない場合は ResourceNotFoundException
+    shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
+    try {
+      repository.updateShop(shop);
+    } catch (DuplicateKeyException ex) {
+      throw new DuplicateShopNameException("同じ店名の店が、そのエリアにすでに登録されています。", ex);
+    }
+    return repository.searchShop(shop.getId());
   }
 
   /**

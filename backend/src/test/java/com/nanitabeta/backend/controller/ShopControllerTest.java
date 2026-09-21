@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.util.List;
@@ -17,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
+import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.ShopService;
 
@@ -111,6 +113,57 @@ class ShopControllerTest {
             """));
 
     verify(service, never()).searchShopSuggestions(any(), any());
+  }
+
+  @Test
+  void 店の更新_更新後の店がJSONで返ること() throws Exception {
+    Shop shop = new Shop(1L, "スタバ", 13L, 1L, true);
+    when(service.updateShop(any())).thenReturn(shop);
+
+    mockMvc.perform(put("/api/shops/1").contentType(MediaType.APPLICATION_JSON).content("""
+        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
+        """)).andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(content().json("""
+            {"id": 1, "shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
+            """));
+
+    verify(service).updateShop(new Shop(1L, "スタバ", 13L, 1L, true));
+  }
+
+  @Test
+  void 店の更新_見つからない場合は404が返ること() throws Exception {
+    when(service.updateShop(any())).thenThrow(new ResourceNotFoundException("店が見つかりません。id=999"));
+
+    mockMvc.perform(put("/api/shops/999").contentType(MediaType.APPLICATION_JSON).content("""
+        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
+        """)).andExpect(status().isNotFound()).andExpect(content().json("""
+        {"statusValue": 404, "statusName": "NOT_FOUND", "message": "店が見つかりません。id=999"}
+        """));
+  }
+
+  @Test
+  void 店の更新_店名が重複する場合は409が返ること() throws Exception {
+    when(service.updateShop(any())).thenThrow(
+        new DuplicateShopNameException("同じ店名の店が、そのエリアにすでに登録されています。"));
+
+    mockMvc.perform(put("/api/shops/1").contentType(MediaType.APPLICATION_JSON).content("""
+        {"shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1, "isClosed": false}
+        """)).andExpect(status().isConflict()).andExpect(content().json("""
+        {"statusValue": 409, "statusName": "CONFLICT",
+         "message": "同じ店名の店が、そのエリアにすでに登録されています。"}
+        """));
+  }
+
+  @Test
+  void 店の更新_閉店したかが未指定の場合は400が返ること() throws Exception {
+    mockMvc.perform(put("/api/shops/1").contentType(MediaType.APPLICATION_JSON).content("""
+        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1}
+        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+        {"statusValue": 400, "statusName": "BAD_REQUEST",
+         "message": "閉店したかどうかを指定してください。"}
+        """));
+
+    verify(service, never()).updateShop(any());
   }
 
   @Test

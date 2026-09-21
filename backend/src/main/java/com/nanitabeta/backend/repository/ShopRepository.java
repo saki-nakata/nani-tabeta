@@ -38,6 +38,13 @@ public interface ShopRepository {
   void insertShop(Shop shop);
 
   /**
+   * 店を更新します。
+   *
+   * @param shop 更新する店
+   */
+  void updateShop(Shop shop);
+
+  /**
    * 店名とエリアが一致する店を、最新の確定データから取得します。
    * <p>
    * 引数の店のうち、店名（shopName）とエリアID（areaId）だけを使います。 同時登録を検出したあとに使うため、通常の検索ではなく行ロックを取って読み込みます。

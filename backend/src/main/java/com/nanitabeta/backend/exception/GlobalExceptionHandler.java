@@ -2,6 +2,7 @@ package com.nanitabeta.backend.exception;
 
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -29,6 +30,7 @@ public class GlobalExceptionHandler {
     String message = ex.getBindingResult().getFieldErrors().stream()
         .map(error -> error.getDefaultMessage()).collect(Collectors.joining(" "));
 
+    log.warn("入力内容に誤りがあります: {}", message);
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), message);
     return ResponseEntity.status(status).body(error);
@@ -58,7 +60,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({MissingServletRequestParameterException.class,
       MethodArgumentTypeMismatchException.class})
   public ResponseEntity<ErrorMessage> handleInvalidParameter(Exception ex) {
-    log.warn("リクエストのパラメータが正しくありません", ex);
+    log.warn("リクエストのパラメータが正しくありません: {}", ex.getMessage());
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), "リクエストのパラメータが正しくありません。");
     return ResponseEntity.status(status).body(error);
@@ -72,8 +74,37 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorMessage> handleNotFound(ResourceNotFoundException ex) {
+    log.warn("指定されたデータが見つかりません: {}", ex.getMessage());
     HttpStatus status = HttpStatus.NOT_FOUND;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 店名が他の店と重複する場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateShopNameException.class)
+  public ResponseEntity<ErrorMessage> handleDuplicateShopName(DuplicateShopNameException ex) {
+    log.warn("店名が重複する更新が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 専用の処理を用意していない一意制約違反を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateKeyException.class)
+  public ResponseEntity<ErrorMessage> handleDuplicateKey(DuplicateKeyException ex) {
+    log.warn("専用の処理がない一意制約違反が発生しました", ex);
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), "すでに登録されている内容と重複しています。");
     return ResponseEntity.status(status).body(error);
   }
 
