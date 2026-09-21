@@ -13,12 +13,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
+import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.ShopService;
 
@@ -127,7 +127,7 @@ class ShopControllerTest {
             {"id": 1, "shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
             """));
 
-    verify(service).updateShop(any());
+    verify(service).updateShop(new Shop(1L, "スタバ", 13L, 1L, true));
   }
 
   @Test
@@ -144,7 +144,7 @@ class ShopControllerTest {
   @Test
   void 店の更新_店名が重複する場合は409が返ること() throws Exception {
     when(service.updateShop(any())).thenThrow(
-        new DuplicateKeyException("Duplicate entry 'セブンイレブン-20' for key 'uk_shops_name_area'"));
+        new DuplicateShopNameException("同じ店名の店が、そのエリアにすでに登録されています。"));
 
     mockMvc.perform(put("/api/shops/1").contentType(MediaType.APPLICATION_JSON).content("""
         {"shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1, "isClosed": false}

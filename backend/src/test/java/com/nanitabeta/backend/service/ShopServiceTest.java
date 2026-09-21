@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
+import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 
@@ -123,6 +124,19 @@ class ShopServiceTest {
         .hasMessage("店が見つかりません。id=999");
 
     verify(repository, never()).updateShop(any());
+  }
+
+  @Test
+  void 店の更新_店名が重複する場合は店専用の例外に変換すること() {
+    Shop shop = new Shop(1L, "セブンイレブン", 20L, 9L, false);
+    Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShop(1L)).thenReturn(expected);
+    doThrow(new DuplicateKeyException("重複")).when(repository).updateShop(any());
+
+    assertThatThrownBy(() -> sut.updateShop(shop))
+        .isInstanceOf(DuplicateShopNameException.class)
+        .hasMessage("同じ店名の店が、そのエリアにすでに登録されています。")
+        .hasCauseInstanceOf(DuplicateKeyException.class);
   }
 
   @Test

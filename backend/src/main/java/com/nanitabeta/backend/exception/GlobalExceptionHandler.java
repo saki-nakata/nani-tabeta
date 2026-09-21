@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<ErrorMessage> handleDataIntegrityViolation(
       DataIntegrityViolationException ex) {
-    log.warn("DBの制約に反する操作が行われました: {}", ex.getMessage());
+    log.warn("DBの制約に反する操作が行われました", ex);
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), "指定されたエリアまたは業態が存在しません。");
     return ResponseEntity.status(status).body(error);
@@ -81,17 +81,30 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * 一意制約に違反する場合の例外を処理します。
+   * 店名が他の店と重複する場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateShopNameException.class)
+  public ResponseEntity<ErrorMessage> handleDuplicateShopName(DuplicateShopNameException ex) {
+    log.warn("店名が重複する更新が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 専用の処理を用意していない一意制約違反を処理します。
    *
    * @param ex 発生した例外
    * @return HTTP 409 とエラー内容
    */
   @ExceptionHandler(DuplicateKeyException.class)
-  public ResponseEntity<ErrorMessage> handleConflict(DuplicateKeyException ex) {
-    log.warn("一意制約に違反する操作が行われました: {}", ex.getMessage());
+  public ResponseEntity<ErrorMessage> handleDuplicateKey(DuplicateKeyException ex) {
+    log.warn("専用の処理がない一意制約違反が発生しました", ex);
     HttpStatus status = HttpStatus.CONFLICT;
-    ErrorMessage error =
-        new ErrorMessage(status.value(), status.name(), "同じ店名の店が、そのエリアにすでに登録されています。");
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), "すでに登録されている内容と重複しています。");
     return ResponseEntity.status(status).body(error);
   }
 
