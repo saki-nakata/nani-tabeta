@@ -102,6 +102,30 @@ class ShopServiceTest {
   }
 
   @Test
+  void 店の更新_店名を正規化して更新し更新後の店を返すこと() {
+    Shop shop = new Shop(1L, "　スター　バックス　", 20L, 9L, false); // 前後と途中に全角スペース
+    Shop expected = new Shop(1L, "スター バックス", 20L, 9L, false);
+    when(repository.searchShop(1L)).thenReturn(expected);
+
+    Shop actual = sut.updateShop(shop);
+
+    assertThat(shop.getShopName()).isEqualTo("スター バックス");
+    assertThat(actual).isEqualTo(expected);
+    verify(repository).updateShop(shop);
+  }
+
+  @Test
+  void 店の更新_店が見つからない場合は例外を投げて更新しないこと() {
+    Shop shop = new Shop(999L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShop(999L)).thenReturn(null);
+
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("店が見つかりません。id=999");
+
+    verify(repository, never()).updateShop(any());
+  }
+
+  @Test
   void 店の候補_リポジトリの結果をそのまま返すこと() {
     List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
     when(repository.searchShopSuggestions(any(), any(), anyInt())).thenReturn(expected);

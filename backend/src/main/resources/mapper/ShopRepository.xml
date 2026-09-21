@@ -31,6 +31,16 @@
     VALUES (#{shopName}, #{areaId}, #{shopKindId})
   </insert>
 
+  <!-- 店の更新 -->
+  <update id="updateShop">
+    UPDATE shops
+    SET shop_name = #{shopName},
+        area_id = #{areaId},
+        shop_kind_id = #{shopKindId},
+        is_closed = #{isClosed}
+    WHERE id = #{id}
+  </update>
+
   <!-- エリア内の店の候補（閉店を除く。キーワードは濁点・大文字小文字を区別せずに部分一致） -->
   <select id="searchShopSuggestions" resultType="com.nanitabeta.backend.data.Shop">
     SELECT id, shop_name, area_id, shop_kind_id, is_closed

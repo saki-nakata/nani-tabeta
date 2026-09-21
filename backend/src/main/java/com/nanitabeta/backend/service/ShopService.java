@@ -71,6 +71,24 @@ public class ShopService {
   }
 
   /**
+   * 店を更新します。
+   * <p>
+   * 店名は正規化してから保存します。変更後の店名とエリアが他の店と重複する場合は、 DB の一意制約によって DuplicateKeyException が発生します。
+   *
+   * @param shop 更新する店
+   * @return 更新後の店
+   * @throws ResourceNotFoundException 店が見つからない場合
+   */
+  @Transactional
+  public Shop updateShop(Shop shop) {
+    searchShop(shop.getId());
+
+    shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
+    repository.updateShop(shop);
+    return repository.searchShop(shop.getId());
+  }
+
+  /**
    * 店の登録時に表示する候補を取得します。
    * <p>
    * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
