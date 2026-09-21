@@ -2,6 +2,7 @@ package com.nanitabeta.backend.exception;
 
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -29,6 +30,7 @@ public class GlobalExceptionHandler {
     String message = ex.getBindingResult().getFieldErrors().stream()
         .map(error -> error.getDefaultMessage()).collect(Collectors.joining(" "));
 
+    log.warn("入力内容に誤りがあります: {}", message);
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), message);
     return ResponseEntity.status(status).body(error);
@@ -43,7 +45,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<ErrorMessage> handleDataIntegrityViolation(
       DataIntegrityViolationException ex) {
-    log.warn("DBの制約に反する操作が行われました", ex);
+    log.warn("DBの制約に反する操作が行われました: {}", ex.getMessage());
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), "指定されたエリアまたは業態が存在しません。");
     return ResponseEntity.status(status).body(error);
@@ -58,7 +60,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({MissingServletRequestParameterException.class,
       MethodArgumentTypeMismatchException.class})
   public ResponseEntity<ErrorMessage> handleInvalidParameter(Exception ex) {
-    log.warn("リクエストのパラメータが正しくありません", ex);
+    log.warn("リクエストのパラメータが正しくありません: {}", ex.getMessage());
     HttpStatus status = HttpStatus.BAD_REQUEST;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), "リクエストのパラメータが正しくありません。");
     return ResponseEntity.status(status).body(error);
@@ -72,8 +74,24 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorMessage> handleNotFound(ResourceNotFoundException ex) {
+    log.warn("指定されたデータが見つかりません: {}", ex.getMessage());
     HttpStatus status = HttpStatus.NOT_FOUND;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 一意制約に違反する場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateKeyException.class)
+  public ResponseEntity<ErrorMessage> handleConflict(DuplicateKeyException ex) {
+    log.warn("一意制約に違反する操作が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error =
+        new ErrorMessage(status.value(), status.name(), "同じ店名の店が、そのエリアにすでに登録されています。");
     return ResponseEntity.status(status).body(error);
   }
 
