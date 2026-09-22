@@ -10,6 +10,7 @@ import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
+import com.nanitabeta.backend.util.LikeEscaper;
 import com.nanitabeta.backend.util.NameNormalizer;
 
 /**
@@ -54,9 +55,9 @@ public class ShopService {
   @Transactional
   public ShopRegistration registerShop(Shop shop) {
     shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
-    Shop shopAndArea = repository.searchShopByNameAndArea(shop);
-    if (shopAndArea != null) {
-      return new ShopRegistration(shopAndArea, false);
+    Shop matchedShop = repository.searchShopByNameAndArea(shop);
+    if (matchedShop != null) {
+      return new ShopRegistration(matchedShop, false);
     }
     try {
       repository.insertShop(shop);
@@ -105,18 +106,8 @@ public class ShopService {
   public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
     String condition = null;
     if (keyword != null) {
-      condition = escapeForLike(NameNormalizer.normalize(keyword));
+      condition = LikeEscaper.escape(NameNormalizer.normalize(keyword));
     }
     return repository.searchShopSuggestions(areaId, condition, SUGGESTION_LIMIT);
-  }
-
-  /**
-   * LIKE のワイルドカードとして解釈される文字を、ただの文字として扱えるようにします。
-   *
-   * @param keyword キーワード
-   * @return エスケープ後のキーワード
-   */
-  private String escapeForLike(String keyword) {
-    return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 }
