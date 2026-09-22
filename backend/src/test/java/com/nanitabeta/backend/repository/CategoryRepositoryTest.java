@@ -23,4 +23,18 @@ class CategoryRepositoryTest {
     assertThat(actual.get(0).getCategoryName()).isEqualTo("ごはんもの");
     assertThat(actual.get(0).getCategoryEmoji()).isEqualTo("🍚");
   }
+
+  @Test
+  void 分類を1件取得できること() {
+    Category actual = sut.searchCategory(1L);
+
+    assertThat(actual.getCategoryName()).isEqualTo("ごはんもの");
+  }
+
+  @Test
+  void 分類が見つからない場合はnullを返すこと() {
+    Category actual = sut.searchCategory(999L);
+
+    assertThat(actual).isNull();
+  }
 }

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nanitabeta.backend.repository.ItemRepository">
+
+  <!-- 商品の1件取得 -->
+  <select id="searchItem" resultType="com.nanitabeta.backend.data.Item">
+    SELECT id, shop_id, item_name, category_id, is_seasonal
+    FROM items
+    WHERE id = #{id}
+  </select>
+
+  <!-- 店の商品の候補（キーワードは濁点・大文字小文字を区別せずに部分一致） -->
+  <select id="searchItemSuggestions" resultType="com.nanitabeta.backend.data.Item">
+    SELECT id, shop_id, item_name, category_id, is_seasonal
+    FROM items
+    WHERE shop_id = #{shopId}
+    <if test="keyword != null and keyword != ''">
+      AND item_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{keyword}, '%')
+    </if>
+    ORDER BY item_name
+    LIMIT #{limit}
+  </select>
+
+  <!-- 店と商品名で商品を取得 -->
+  <select id="searchItemByShopAndName" resultType="com.nanitabeta.backend.data.Item">
+    SELECT id, shop_id, item_name, category_id, is_seasonal
+    FROM items
+    WHERE shop_id = #{shopId} AND item_name = #{itemName}
+  </select>
+
+  <!-- 店と商品名で商品を取得（行ロックを取り、最新の確定データを読む） -->
+  <select id="searchItemByShopAndNameForShare" resultType="com.nanitabeta.backend.data.Item">
+    SELECT id, shop_id, item_name, category_id, is_seasonal
+    FROM items
+    WHERE shop_id = #{shopId} AND item_name = #{itemName}
+    FOR SHARE
+  </select>
+
+  <!-- 商品の登録 -->
+  <insert id="insertItem" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO items (shop_id, item_name, category_id, is_seasonal)
+    VALUES (#{shopId}, #{itemName}, #{categoryId}, #{isSeasonal})
+  </insert>
+
+  <!-- 商品の更新 -->
+  <update id="updateItem">
+    UPDATE items
+    SET item_name = #{itemName},
+        category_id = #{categoryId},
+        is_seasonal = #{isSeasonal}
+    WHERE id = #{id}
+  </update>
+</mapper>
