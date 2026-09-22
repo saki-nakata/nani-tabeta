@@ -67,6 +67,20 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 指定された分類が存在しない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidCategoryException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidCategory(InvalidCategoryException ex) {
+    log.warn("存在しない分類が指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 指定されたデータが見つからない場合の例外を処理します。
    *
    * @param ex 発生した例外
@@ -89,6 +103,20 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DuplicateShopNameException.class)
   public ResponseEntity<ErrorMessage> handleDuplicateShopName(DuplicateShopNameException ex) {
     log.warn("店名が重複する更新が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 商品名が同じ店の他の商品と重複する場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateItemNameException.class)
+  public ResponseEntity<ErrorMessage> handleDuplicateItemName(DuplicateItemNameException ex) {
+    log.warn("商品名が重複する更新が行われました: {}", ex.getMessage());
     HttpStatus status = HttpStatus.CONFLICT;
     ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
     return ResponseEntity.status(status).body(error);

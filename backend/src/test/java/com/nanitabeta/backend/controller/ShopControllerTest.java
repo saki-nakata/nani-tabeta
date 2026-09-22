@@ -33,7 +33,8 @@ class ShopControllerTest {
 
   @Test
   void 店の取得_店がJSONで返ること() throws Exception {
-    when(service.searchShop(1L)).thenReturn(new Shop(1L, "スターバックス", 20L, 9L, false));
+    Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(service.searchShop(1L)).thenReturn(expected);
 
     mockMvc.perform(get("/api/shops/1")).andExpect(status().isOk())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(content().json("""
@@ -55,8 +56,8 @@ class ShopControllerTest {
 
   @Test
   void 店の登録_新しく登録した場合は201が返ること() throws Exception {
-    Shop shop = new Shop(1L, "セブンイレブン", 27L, 1L, false);
-    when(service.registerShop(any())).thenReturn(new ShopRegistration(shop, true));
+    Shop expected = new Shop(1L, "セブンイレブン", 27L, 1L, false);
+    when(service.registerShop(any())).thenReturn(new ShopRegistration(expected, true));
 
     mockMvc.perform(post("/api/shops").contentType(MediaType.APPLICATION_JSON).content("""
         {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
@@ -68,8 +69,8 @@ class ShopControllerTest {
 
   @Test
   void 店の登録_既存の店があった場合は200が返ること() throws Exception {
-    Shop shop = new Shop(1L, "セブンイレブン", 27L, 1L, false);
-    when(service.registerShop(any())).thenReturn(new ShopRegistration(shop, false));
+    Shop expected = new Shop(1L, "セブンイレブン", 27L, 1L, false);
+    when(service.registerShop(any())).thenReturn(new ShopRegistration(expected, false));
 
     mockMvc.perform(post("/api/shops").contentType(MediaType.APPLICATION_JSON).content("""
         {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
@@ -117,8 +118,8 @@ class ShopControllerTest {
 
   @Test
   void 店の更新_更新後の店がJSONで返ること() throws Exception {
-    Shop shop = new Shop(1L, "スタバ", 13L, 1L, true);
-    when(service.updateShop(any())).thenReturn(shop);
+    Shop expected = new Shop(1L, "スタバ", 13L, 1L, true);
+    when(service.updateShop(any())).thenReturn(expected);
 
     mockMvc.perform(put("/api/shops/1").contentType(MediaType.APPLICATION_JSON).content("""
         {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
@@ -127,7 +128,7 @@ class ShopControllerTest {
             {"id": 1, "shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
             """));
 
-    verify(service).updateShop(new Shop(1L, "スタバ", 13L, 1L, true));
+    verify(service).updateShop(expected);
   }
 
   @Test

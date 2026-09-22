@@ -10,4 +10,11 @@
     ORDER BY id
   </select>
 
+  <!-- 分類の1件取得 -->
+  <select id="searchCategory" resultType="com.nanitabeta.backend.data.Category">
+    SELECT id, category_name, category_emoji
+    FROM categories
+    WHERE id = #{id}
+  </select>
+
 </mapper>
