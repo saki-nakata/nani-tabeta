@@ -81,6 +81,34 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 指定されたエリアが存在しない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidAreaException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidArea(InvalidAreaException ex) {
+    log.warn("存在しないエリアが指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 指定された業態が存在しない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidShopKindException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidShopKind(InvalidShopKindException ex) {
+    log.warn("存在しない業態が指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 指定されたデータが見つからない場合の例外を処理します。
    *
    * @param ex 発生した例外

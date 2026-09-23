@@ -32,6 +32,18 @@ class AreaRepositoryTest {
     assertThat(actual.get(0).getAreaName()).isEqualTo("北海道");
     assertThat(actual.get(0).getRegionId()).isEqualTo(1L);
   }
+
+  @Test
+  void エリアを1件取得できること() {
+    Area actual = sut.searchArea(1L);
+
+    assertThat(actual.getAreaName()).isEqualTo("北海道");
+  }
+
+  @Test
+  void エリアが見つからない場合はnullを返すこと() {
+    Area actual = sut.searchArea(999L);
+
+    assertThat(actual).isNull();
+  }
 }
-
-

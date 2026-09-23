@@ -1,6 +1,7 @@
 package com.nanitabeta.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import com.nanitabeta.backend.controller.converter.AreaConverter;
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region; // javax.swing の Region を選ばないこと
 import com.nanitabeta.backend.domain.RegionDetail;
+import com.nanitabeta.backend.exception.InvalidAreaException;
 import com.nanitabeta.backend.repository.AreaRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,5 +47,22 @@ class AreaServiceTest {
     verify(repository, times(1)).searchAreaList();
     verify(converter, times(1)).mapToRegionDetailList(regionList, areaList);
   }
-}
 
+  @Test
+  void エリアの取得_リポジトリの結果をそのまま返すこと() {
+    Area expected = new Area(13L, 2L, "東京都");
+    when(repository.searchArea(13L)).thenReturn(expected);
+
+    Area actual = sut.searchArea(13L);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void エリアの取得_見つからない場合は例外を投げること() {
+    when(repository.searchArea(999L)).thenReturn(null);
+
+    assertThatThrownBy(() -> sut.searchArea(999L)).isInstanceOf(InvalidAreaException.class)
+        .hasMessage("指定されたエリアが存在しません。areaId=999");
+  }
+}

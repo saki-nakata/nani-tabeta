@@ -1,6 +1,7 @@
 package com.nanitabeta.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.nanitabeta.backend.data.ShopKind;
+import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.repository.ShopKindRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,5 +33,24 @@ class ShopKindServiceTest {
 
     assertThat(actual).isEqualTo(expected);
     verify(repository, times(1)).searchShopKindList();
+  }
+
+  @Test
+  void 業態の取得_リポジトリの結果をそのまま返すこと() {
+    ShopKind expected = new ShopKind(1L, "コンビニ", "🏪");
+    when(repository.searchShopKind(1L)).thenReturn(expected);
+
+    ShopKind actual = sut.searchShopKind(1L);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 業態の取得_見つからない場合は例外を投げること() {
+    when(repository.searchShopKind(999L)).thenReturn(null);
+
+    assertThatThrownBy(() -> sut.searchShopKind(999L))
+        .isInstanceOf(InvalidShopKindException.class)
+        .hasMessage("指定された業態が存在しません。shopKindId=999");
   }
 }

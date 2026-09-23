@@ -7,6 +7,7 @@ import com.nanitabeta.backend.controller.converter.AreaConverter;
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region;
 import com.nanitabeta.backend.domain.RegionDetail;
+import com.nanitabeta.backend.exception.InvalidAreaException;
 import com.nanitabeta.backend.repository.AreaRepository;
 
 /**
@@ -34,4 +35,18 @@ public class AreaService {
     return converter.mapToRegionDetailList(regionList, areaList);
   }
 
+  /**
+   * エリアを1件取得します。
+   *
+   * @param id エリアID
+   * @return エリア
+   * @throws InvalidAreaException エリアが存在しない場合
+   */
+  public Area searchArea(Long id) {
+    Area area = repository.searchArea(id);
+    if (area == null) {
+      throw new InvalidAreaException("指定されたエリアが存在しません。areaId=" + id);
+    }
+    return area;
+  }
 }

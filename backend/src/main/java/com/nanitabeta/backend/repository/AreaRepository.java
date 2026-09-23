@@ -25,4 +25,11 @@ public interface AreaRepository {
    */
   List<Area> searchAreaList();
 
+  /**
+   * エリアを1件取得します。
+   *
+   * @param id エリアID
+   * @return エリア（見つからない場合は null）
+   */
+  Area searchArea(Long id);
 }

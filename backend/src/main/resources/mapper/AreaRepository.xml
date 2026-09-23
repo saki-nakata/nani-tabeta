@@ -17,4 +17,11 @@
     ORDER BY id
   </select>
 
+  <!-- エリアの1件取得 -->
+  <select id="searchArea" resultType="com.nanitabeta.backend.data.Area">
+    SELECT id, region_id, area_name
+    FROM areas
+    WHERE id = #{id}
+  </select>
+
 </mapper>

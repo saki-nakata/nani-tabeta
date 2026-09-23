@@ -21,6 +21,8 @@ import org.springframework.dao.DuplicateKeyException;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
+import com.nanitabeta.backend.exception.InvalidAreaException;
+import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 
@@ -29,6 +31,12 @@ class ShopServiceTest {
 
   @Mock
   private ShopRepository repository;
+
+  @Mock
+  private AreaService areaService;
+
+  @Mock
+  private ShopKindService shopKindService;
 
   @InjectMocks
   private ShopService sut;
@@ -123,6 +131,8 @@ class ShopServiceTest {
     assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("店が見つかりません。id=999");
 
+    verify(areaService, never()).searchArea(any()); // 店の確認で止まり、エリアは確認しない
+    verify(shopKindService, never()).searchShopKind(any()); // 業態も確認しない
     verify(repository, never()).updateShop(any());
   }
 
@@ -175,5 +185,71 @@ class ShopServiceTest {
     sut.searchShopSuggestions(20L, null);
 
     verify(repository).searchShopSuggestions(eq(20L), isNull(), anyInt());
+  }
+
+  @Test
+  void 店の登録_エリアが存在しない場合は例外を投げて登録しないこと() {
+    Shop shop = new Shop(null, "スターバックス", 999L, 9L, null);
+    doThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999")).when(areaService)
+        .searchArea(999L);
+
+    assertThatThrownBy(() -> sut.registerShop(shop)).isInstanceOf(InvalidAreaException.class)
+        .hasMessage("指定されたエリアが存在しません。areaId=999");
+
+    verify(shopKindService, never()).searchShopKind(any()); // エリアの確認で止まり、業態は確認しない
+    verify(repository, never()).insertShop(any());
+  }
+
+  @Test
+  void 店の登録_業態が存在しない場合は例外を投げて登録しないこと() {
+    Shop shop = new Shop(null, "スターバックス", 20L, 999L, null);
+    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999"))
+        .when(shopKindService).searchShopKind(999L);
+
+    assertThatThrownBy(() -> sut.registerShop(shop)).isInstanceOf(InvalidShopKindException.class)
+        .hasMessage("指定された業態が存在しません。shopKindId=999");
+
+    verify(repository, never()).insertShop(any());
+  }
+
+  @Test
+  void 店の更新_エリアが存在しない場合は例外を投げて更新しないこと() {
+    Shop shop = new Shop(1L, "スターバックス", 999L, 9L, false);
+    Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShop(1L)).thenReturn(expected);
+    doThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999")).when(areaService)
+        .searchArea(999L);
+
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(InvalidAreaException.class)
+        .hasMessage("指定されたエリアが存在しません。areaId=999");
+
+    verify(shopKindService, never()).searchShopKind(any()); // エリアの確認で止まり、業態は確認しない
+    verify(repository, never()).updateShop(any());
+  }
+
+  @Test
+  void 店の更新_業態が存在しない場合は例外を投げて更新しないこと() {
+    Shop shop = new Shop(1L, "スターバックス", 20L, 999L, false);
+    Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShop(1L)).thenReturn(expected);
+    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999"))
+        .when(shopKindService).searchShopKind(999L);
+
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(InvalidShopKindException.class)
+        .hasMessage("指定された業態が存在しません。shopKindId=999");
+
+    verify(repository, never()).updateShop(any());
+  }
+
+  @Test
+  void 店の候補_エリアが存在しない場合は例外を投げて検索しないこと() {
+    doThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999")).when(areaService)
+        .searchArea(999L);
+
+    assertThatThrownBy(() -> sut.searchShopSuggestions(999L, null))
+        .isInstanceOf(InvalidAreaException.class)
+        .hasMessage("指定されたエリアが存在しません。areaId=999");
+
+    verify(repository, never()).searchShopSuggestions(any(), any(), anyInt());
   }
 }
