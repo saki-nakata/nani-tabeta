@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
+import com.nanitabeta.backend.exception.InvalidAreaException;
+import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.ShopService;
 
@@ -176,5 +178,30 @@ class ShopControllerTest {
             """));
 
     verify(service, never()).searchShop(any());
+  }
+
+  @Test
+  void 店の登録_業態が存在しない場合は400が返ること() throws Exception {
+    when(service.registerShop(any()))
+        .thenThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999"));
+
+    mockMvc.perform(post("/api/shops").contentType(MediaType.APPLICATION_JSON).content("""
+        {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 999}
+        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "指定された業態が存在しません。shopKindId=999"}
+            """));
+  }
+
+  @Test
+  void 店の候補の取得_エリアが存在しない場合は400が返ること() throws Exception {
+    when(service.searchShopSuggestions(any(), any()))
+        .thenThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999"));
+
+    mockMvc.perform(get("/api/shops/suggestions").param("areaId", "999"))
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "指定されたエリアが存在しません。areaId=999"}
+            """));
   }
 }

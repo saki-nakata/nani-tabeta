@@ -23,4 +23,18 @@ class ShopKindRepositoryTest {
     assertThat(actual.get(0).getShopKindName()).isEqualTo("コンビニ");
     assertThat(actual.get(0).getShopKindEmoji()).isEqualTo("🏪");
   }
+
+  @Test
+  void 業態を1件取得できること() {
+    ShopKind actual = sut.searchShopKind(1L);
+
+    assertThat(actual.getShopKindName()).isEqualTo("コンビニ");
+  }
+
+  @Test
+  void 業態が見つからない場合はnullを返すこと() {
+    ShopKind actual = sut.searchShopKind(999L);
+
+    assertThat(actual).isNull();
+  }
 }

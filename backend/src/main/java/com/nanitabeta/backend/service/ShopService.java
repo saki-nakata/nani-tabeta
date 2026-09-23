@@ -23,10 +23,15 @@ public class ShopService {
   private static final int SUGGESTION_LIMIT = 10;
 
   private ShopRepository repository;
+  private AreaService areaService;
+  private ShopKindService shopKindService;
 
   @Autowired
-  public ShopService(ShopRepository repository) {
+  public ShopService(ShopRepository repository, AreaService areaService,
+      ShopKindService shopKindService) {
     this.repository = repository;
+    this.areaService = areaService;
+    this.shopKindService = shopKindService;
   }
 
   /**
@@ -54,6 +59,8 @@ public class ShopService {
    */
   @Transactional
   public ShopRegistration registerShop(Shop shop) {
+    areaService.searchArea(shop.getAreaId()); // 存在しない場合は InvalidAreaException
+    shopKindService.searchShopKind(shop.getShopKindId()); // 存在しない場合は InvalidShopKindException
     shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
     Shop matchedShop = repository.searchShopByNameAndArea(shop);
     if (matchedShop != null) {
@@ -85,6 +92,8 @@ public class ShopService {
   @Transactional
   public Shop updateShop(Shop shop) {
     searchShop(shop.getId()); // 存在しない場合は ResourceNotFoundException
+    areaService.searchArea(shop.getAreaId()); // 存在しない場合は InvalidAreaException
+    shopKindService.searchShopKind(shop.getShopKindId()); // 存在しない場合は InvalidShopKindException
     shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
     try {
       repository.updateShop(shop);
@@ -104,6 +113,7 @@ public class ShopService {
    * @return 店の一覧（該当がない場合は空のリスト）
    */
   public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
+    areaService.searchArea(areaId); // 存在しない場合は InvalidAreaException
     String condition = null;
     if (keyword != null) {
       condition = LikeEscaper.escape(NameNormalizer.normalize(keyword));

@@ -64,7 +64,7 @@ public class ShopController {
   @Operation(summary = "店の登録", description = "店を登録します。同じ店名とエリアの店があれば、その店を返します。")
   @ApiResponse(responseCode = "201", description = "新しく登録した")
   @ApiResponse(responseCode = "200", description = "既存の店を使った")
-  @ApiResponse(responseCode = "400", description = "入力内容に誤りがある",
+  @ApiResponse(responseCode = "400", description = "入力内容に誤りがある、またはエリア・業態が存在しない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @PostMapping("/api/shops")
   public ResponseEntity<Shop> registerShop(@RequestBody @Valid ShopCreateRequest request) {
@@ -84,7 +84,7 @@ public class ShopController {
    */
   @Operation(summary = "店の更新", description = "店名・エリア・業態・閉店したかを更新します。")
   @ApiResponse(responseCode = "200", description = "更新成功")
-  @ApiResponse(responseCode = "400", description = "入力内容に誤りがある",
+  @ApiResponse(responseCode = "400", description = "入力内容に誤りがある、またはエリア・業態が存在しない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @ApiResponse(responseCode = "404", description = "店が見つからない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
@@ -106,7 +106,7 @@ public class ShopController {
    */
   @Operation(summary = "店の候補の取得", description = "エリア内の店を候補として取得します。閉店した店は含みません。")
   @ApiResponse(responseCode = "200", description = "取得成功")
-  @ApiResponse(responseCode = "400", description = "エリアIDが指定されていない",
+  @ApiResponse(responseCode = "400", description = "エリアIDが指定されていない、数値でない、またはエリアが存在しない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @GetMapping("/api/shops/suggestions")
   public List<Shop> searchShopSuggestions(@RequestParam Long areaId,

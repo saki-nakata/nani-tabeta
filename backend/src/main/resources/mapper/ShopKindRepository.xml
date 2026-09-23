@@ -10,4 +10,11 @@
     ORDER BY id
   </select>
 
+  <!-- 業態の1件取得 -->
+  <select id="searchShopKind" resultType="com.nanitabeta.backend.data.ShopKind">
+    SELECT id, shop_kind_name, shop_kind_emoji
+    FROM shop_kinds
+    WHERE id = #{id}
+  </select>
+
 </mapper>
