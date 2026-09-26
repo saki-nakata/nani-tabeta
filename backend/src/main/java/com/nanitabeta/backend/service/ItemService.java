@@ -73,12 +73,13 @@ public class ItemService {
    * <p>
    * 記録の登録処理から、同じトランザクションの内側で呼び出されます。
    *
-   * @param item 登録する商品
+   * @param input 登録する商品（この引数は変更しない）
    * @return 登録した商品、または既存の商品
    */
   @Transactional
-  public Item registerItem(Item item) {
-    item.setItemName(NameNormalizer.normalize(item.getItemName()));
+  public Item registerItem(Item input) {
+    Item item = new Item(input.getId(), input.getShopId(),
+        NameNormalizer.normalize(input.getItemName()), input.getCategoryId(), input.getIsSeasonal());
     Item matchedItem = repository.searchItemByShopAndName(item);
     if (matchedItem != null) {
       return matchedItem;
@@ -100,17 +101,17 @@ public class ItemService {
    * <p>
    * 商品名は正規化してから保存します。変更後の商品名が同じ店の他の商品と重複する場合は、 DuplicateItemNameException が発生します。
    *
-   * @param item 更新する商品
+   * @param input 更新する商品（リクエストの内容。この引数は変更しない）
    * @return 更新後の商品
    * @throws ResourceNotFoundException 商品が見つからない場合
    * @throws DuplicateItemNameException 商品名が同じ店の他の商品と重複する場合
    */
   @Transactional
-  public Item updateItem(Item item) {
-    searchItem(item.getId()); // 存在しない場合は ResourceNotFoundException
-    categoryService.searchCategory(item.getCategoryId()); // 存在しない場合は 400
-
-    item.setItemName(NameNormalizer.normalize(item.getItemName()));
+  public Item updateItem(Item input) {
+    searchItem(input.getId()); // 存在しない場合は ResourceNotFoundException
+    categoryService.searchCategory(input.getCategoryId()); // 存在しない場合は 400
+    Item item = new Item(input.getId(), input.getShopId(),
+        NameNormalizer.normalize(input.getItemName()), input.getCategoryId(), input.getIsSeasonal());
     try {
       repository.updateItem(item);
     } catch (DuplicateKeyException ex) {

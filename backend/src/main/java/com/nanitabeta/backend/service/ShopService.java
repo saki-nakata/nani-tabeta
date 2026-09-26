@@ -54,14 +54,15 @@ public class ShopService {
    * <p>
    * 店名を正規化したうえで、同じ店名とエリアの店がすでにあれば、新しく作らずにその店を返します。 同時に同じ店が登録された場合も、あとから登録したほうは既存の店を返します。
    *
-   * @param shop 登録する店
+   * @param input 登録する店（リクエストの内容。この引数は変更しない）
    * @return 登録結果
    */
   @Transactional
-  public ShopRegistration registerShop(Shop shop) {
-    areaService.searchArea(shop.getAreaId()); // 存在しない場合は InvalidAreaException
-    shopKindService.searchShopKind(shop.getShopKindId()); // 存在しない場合は InvalidShopKindException
-    shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
+  public ShopRegistration registerShop(Shop input) {
+    areaService.searchArea(input.getAreaId()); // 存在しない場合は InvalidAreaException
+    shopKindService.searchShopKind(input.getShopKindId()); // 存在しない場合は InvalidShopKindException
+    Shop shop = new Shop(input.getId(), NameNormalizer.normalize(input.getShopName()),
+        input.getAreaId(), input.getShopKindId(), input.getIsClosed());
     Shop matchedShop = repository.searchShopByNameAndArea(shop);
     if (matchedShop != null) {
       return new ShopRegistration(matchedShop, false);
@@ -84,17 +85,18 @@ public class ShopService {
    * <p>
    * 店名は正規化してから保存します。変更後の店名とエリアが他の店と重複する場合は、 DuplicateShopNameException が発生します。
    *
-   * @param shop 更新する店
+   * @param input 更新する店（リクエストの内容。この引数は変更しない）
    * @return 更新後の店
    * @throws ResourceNotFoundException 店が見つからない場合
    * @throws DuplicateShopNameException 店名とエリアが他の店と重複する場合
    */
   @Transactional
-  public Shop updateShop(Shop shop) {
-    searchShop(shop.getId()); // 存在しない場合は ResourceNotFoundException
-    areaService.searchArea(shop.getAreaId()); // 存在しない場合は InvalidAreaException
-    shopKindService.searchShopKind(shop.getShopKindId()); // 存在しない場合は InvalidShopKindException
-    shop.setShopName(NameNormalizer.normalize(shop.getShopName()));
+  public Shop updateShop(Shop input) {
+    searchShop(input.getId()); // 存在しない場合は ResourceNotFoundException
+    areaService.searchArea(input.getAreaId()); // 存在しない場合は InvalidAreaException
+    shopKindService.searchShopKind(input.getShopKindId()); // 存在しない場合は InvalidShopKindException
+    Shop shop = new Shop(input.getId(), NameNormalizer.normalize(input.getShopName()),
+        input.getAreaId(), input.getShopKindId(), input.getIsClosed());
     try {
       repository.updateShop(shop);
     } catch (DuplicateKeyException ex) {
