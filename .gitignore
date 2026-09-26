@@ -32,3 +32,6 @@ Thumbs.db
 
 # 削除待ち
 delete/
+
+# ブラウザでの動作確認の記録（Playwright MCP）
+.playwright-mcp/

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nanitabeta.backend.repository.UserRepository">
+
+  <!-- ユーザーの1件取得 -->
+  <select id="searchUser" resultType="com.nanitabeta.backend.data.User">
+    SELECT id, nickname, bio, profile_photo_url, role
+    FROM users
+    WHERE id = #{id}
+  </select>
+
+  <!-- ユーザーの登録（権限は DB の初期値 user になる） -->
+  <insert id="insertUser">
+    INSERT INTO users (id, nickname)
+    VALUES (#{id}, #{nickname})
+  </insert>
+
+</mapper>
