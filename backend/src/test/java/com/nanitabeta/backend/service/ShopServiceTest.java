@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -78,13 +79,18 @@ class ShopServiceTest {
     Shop shop = new Shop(null, "スターバックス", 20L, 9L, null);
     Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
     when(repository.searchShopByNameAndArea(any())).thenReturn(null);
-    when(repository.searchShop(any())).thenReturn(expected);
+    doAnswer(invocation -> {
+      Shop inserted = invocation.getArgument(0);
+      inserted.setId(1L); // DB が振った ID を書き戻す（useGeneratedKeys の代わり）
+      return null;
+    }).when(repository).insertShop(any());
+    when(repository.searchShop(1L)).thenReturn(expected);
 
     ShopRegistration actual = sut.registerShop(shop);
 
     assertThat(actual.isCreated()).isTrue();
     assertThat(actual.getShop()).isEqualTo(expected);
-    verify(repository, times(1)).insertShop(shop);
+    verify(repository).searchShop(1L); // INSERT で振られた ID で取り直すこと
   }
 
   @Test
@@ -104,23 +110,27 @@ class ShopServiceTest {
   @Test
   void 店の登録_店名を正規化してから探すこと() {
     Shop shop = new Shop(null, "　スターバックス　", 20L, 9L, null); // 前後に全角スペース
+    Shop expectedArgument = new Shop(null, "スターバックス", 20L, 9L, null);
 
     sut.registerShop(shop);
 
-    assertThat(shop.getShopName()).isEqualTo("スターバックス");
+    verify(repository).searchShopByNameAndArea(expectedArgument);
+    verify(repository).insertShop(expectedArgument);
+    assertThat(shop.getShopName()).isEqualTo("　スターバックス　"); // 受け取った引数は変更しないこと
   }
 
   @Test
   void 店の更新_店名を正規化して更新し更新後の店を返すこと() {
     Shop shop = new Shop(1L, "　スター　バックス　", 20L, 9L, false); // 前後と途中に全角スペース
+    Shop expectedArgument = new Shop(1L, "スター バックス", 20L, 9L, false);
     Shop expected = new Shop(1L, "スター バックス", 20L, 9L, false);
     when(repository.searchShop(1L)).thenReturn(expected);
 
     Shop actual = sut.updateShop(shop);
 
-    assertThat(shop.getShopName()).isEqualTo("スター バックス");
     assertThat(actual).isEqualTo(expected);
-    verify(repository).updateShop(shop);
+    verify(repository).updateShop(expectedArgument);
+    assertThat(shop.getShopName()).isEqualTo("　スター　バックス　"); // 受け取った引数は変更しないこと
   }
 
   @Test

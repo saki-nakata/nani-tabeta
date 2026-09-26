@@ -43,16 +43,16 @@ public class UserService {
    * <p>
    * ニックネームは正規化してから保存します。同じIDのユーザーがすでにいる場合は、 DuplicateUserException が発生します。
    *
-   * @param user 登録するユーザー
+   * @param input 登録するユーザー（リクエストの内容。この引数は変更しない）
    * @return 登録したユーザー
    * @throws DuplicateUserException すでに登録されている場合
    */
   @Transactional
-  public User registerUser(User user) {
-    User normalizedUser = new User(user.getId(), NameNormalizer.normalize(user.getNickname()),
-        user.getBio(), user.getProfilePhotoUrl(), user.getRole());
+  public User registerUser(User input) {
+    User user = new User(input.getId(), NameNormalizer.normalize(input.getNickname()),
+        input.getBio(), input.getProfilePhotoUrl(), input.getRole());
     try {
-      repository.insertUser(normalizedUser);
+      repository.insertUser(user);
     } catch (DuplicateKeyException ex) {
       throw new DuplicateUserException("このユーザーはすでに登録されています。", ex);
     }

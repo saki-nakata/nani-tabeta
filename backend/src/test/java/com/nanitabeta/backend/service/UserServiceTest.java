@@ -57,6 +57,7 @@ class UserServiceTest {
 
     assertThat(actual).isEqualTo(expected);
     verify(repository).insertUser(expectedArgument); // 正規化した名前で保存を依頼すること
+    assertThat(user.getNickname()).isEqualTo("　Saki　"); // 受け取った引数は変更しないこと
   }
 
   @Test

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,12 +123,17 @@ class ItemServiceTest {
     Item item = new Item(null, 1L, "からあげ棒", 4L, false);
     Item expected = new Item(1L, 1L, "からあげ棒", 4L, false);
     when(repository.searchItemByShopAndName(any())).thenReturn(null);
-    when(repository.searchItem(any())).thenReturn(expected);
+    doAnswer(invocation -> {
+      Item inserted = invocation.getArgument(0);
+      inserted.setId(1L); // DB が振った ID を書き戻す（useGeneratedKeys の代わり）
+      return null;
+    }).when(repository).insertItem(any());
+    when(repository.searchItem(1L)).thenReturn(expected);
 
     Item actual = sut.registerItem(item);
 
     assertThat(actual).isEqualTo(expected);
-    verify(repository).insertItem(item);
+    verify(repository).searchItem(1L); // INSERT で振られた ID で取り直すこと
   }
 
   @Test
@@ -146,23 +152,27 @@ class ItemServiceTest {
   @Test
   void 商品の登録_商品名を正規化してから探すこと() {
     Item item = new Item(null, 1L, "　からあげ　棒　", 4L, false); // 前後と途中に全角スペース
+    Item expectedArgument = new Item(null, 1L, "からあげ 棒", 4L, false);
 
     sut.registerItem(item);
 
-    assertThat(item.getItemName()).isEqualTo("からあげ 棒");
+    verify(repository).searchItemByShopAndName(expectedArgument);
+    verify(repository).insertItem(expectedArgument);
+    assertThat(item.getItemName()).isEqualTo("　からあげ　棒　"); // 受け取った引数は変更しないこと
   }
 
   @Test
   void 商品の更新_商品名を正規化して更新し更新後の商品を返すこと() {
     Item item = new Item(1L, null, "　からあげ　棒　", 4L, false); // 前後と途中に全角スペース
+    Item expectedArgument = new Item(1L, null, "からあげ 棒", 4L, false);
     Item expected = new Item(1L, 1L, "からあげ 棒", 4L, false);
     when(repository.searchItem(1L)).thenReturn(expected);
 
     Item actual = sut.updateItem(item);
 
-    assertThat(item.getItemName()).isEqualTo("からあげ 棒");
     assertThat(actual).isEqualTo(expected);
-    verify(repository).updateItem(item);
+    verify(repository).updateItem(expectedArgument);
+    assertThat(item.getItemName()).isEqualTo("　からあげ　棒　"); // 受け取った引数は変更しないこと
   }
 
   @Test
