@@ -3,6 +3,7 @@ package com.nanitabeta.backend.controller;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,9 +11,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.nanitabeta.backend.config.SecurityConfig;
+import com.nanitabeta.backend.config.UserAuthenticationConverter;
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region;                // javax.swing の Region を選ばないこと
 import com.nanitabeta.backend.domain.RegionDetail;
@@ -20,6 +24,7 @@ import com.nanitabeta.backend.service.AreaService;
 
 
 @WebMvcTest(AreaController.class)
+@Import(SecurityConfig.class)
 class AreaControllerTest {
 
   @Autowired
@@ -27,6 +32,9 @@ class AreaControllerTest {
 
   @MockitoBean
   private AreaService service;
+
+  @MockitoBean
+  private UserAuthenticationConverter userAuthenticationConverter; // jwt() では使われない
 
   @Test
   void エリアの一覧取得_地域ごとにエリアをまとめたJSONが返ること() throws Exception {
@@ -36,7 +44,7 @@ class AreaControllerTest {
         new Area(14L, 2L, "神奈川県"));
     when(service.searchRegionDetailList()).thenReturn(List.of(new RegionDetail(kanto, areaList)));
 
-    mockMvc.perform(get("/api/areas"))
+    mockMvc.perform(get("/api/areas").with(registeredUser()))
         .andExpect(status().isOk())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(content().json("""

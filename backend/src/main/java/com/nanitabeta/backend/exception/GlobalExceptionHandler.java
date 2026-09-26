@@ -151,6 +151,20 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * ユーザーがすでに登録されている場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(DuplicateUserException.class)
+  public ResponseEntity<ErrorMessage> handleDuplicateUser(DuplicateUserException ex) {
+    log.warn("登録済みのユーザーが再度登録しようとしました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 専用の処理を用意していない一意制約違反を処理します。
    *
    * @param ex 発生した例外

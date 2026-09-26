@@ -5,7 +5,7 @@
 
 ## 開発状況
 
-設計・環境構築・DB構築が完了し、これからバックエンドの実装に入ります。
+バックエンドを実装中です。マスタ参照・店・商品の API と、認証（JWT の検証・ユーザー登録）まで完成しています。
 
 - [x] 要件定義
 - [x] ER図・テーブル設計
@@ -25,12 +25,13 @@
 | フロントエンド | Next.js 16.3.4 (App Router) / React 19.2.8 / TypeScript 5.9 / Tailwind CSS v4 |
 | バックエンド | Java 25 / Spring Boot 4.0.8 / MyBatis / Flyway |
 | データベース | MySQL 8.4（Docker Compose）|
+| 認証（サーバー側） | Spring Security による Supabase Auth の JWT 検証 |
 
 ### 今後実装
 
 | 領域 | 技術 |
 |---|---|
-| 認証 | Supabase Auth（Google OAuth）＋ Spring Security による JWT 検証 |
+| 認証（ログイン画面） | Supabase Auth（Google OAuth） |
 | ファイル保存 | Supabase Storage |
 | UIコンポーネント | shadcn/ui |
 | 外部API | Google Places API（店名の入力補助）|
@@ -64,12 +65,19 @@ cd nani-tabeta
 Copy-Item .env.sample .env
 ```
 
-`.env` を開き、パスワードを設定します。
+`.env` を開き、次の値を設定します。
 
 ```
 MYSQL_ROOT_PASSWORD=（任意の値）
 MYSQL_PASSWORD=（root とは別の値）
+SUPABASE_URL=https://<project-ref>.supabase.co
 ```
+
+`SUPABASE_URL` は、Supabase のダッシュボードの **Project Settings → API** にある **Project URL** です。
+バックエンドはこの URL から、JWT の発行者（`/auth/v1`）と、署名を確かめる公開鍵（`/auth/v1/.well-known/jwks.json`）の場所を決めます。
+
+- **末尾に `/` を付けないでください。** 付けると `…supabase.co//auth/v1` になり、すべての JWT が検証に失敗します
+- `/rest/v1/` など、後ろのパスも付けません
 
 `.env` は Git 管理外です。コミットしないでください。
 
@@ -96,6 +104,11 @@ cd backend
 **テーブルの作成は不要です。** 起動時に Flyway が
 `backend/src/main/resources/db/migration/` の SQL を自動で適用し、
 テーブルとマスタデータ（地域・エリア・分類・業態）を作ります。
+
+API は Swagger UI（http://localhost:8080/swagger-ui/index.html）で確認できます。
+Swagger UI 以外の API は Supabase Auth の JWT が必要です。右上の **Authorize** に JWT（`access_token`）を入力すると、
+Swagger UI から送るリクエストに `Authorization: Bearer …` が付きます。
+JWT の `sub` のユーザーがまだ登録されていない場合は、`POST /api/users` 以外は 403 になります。
 
 ### 5. フロントエンドを起動する
 
