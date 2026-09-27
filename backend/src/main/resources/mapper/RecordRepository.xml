@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nanitabeta.backend.repository.RecordRepository">
+
+  <!-- 記録の1件取得 -->
+  <select id="searchRecord" resultType="com.nanitabeta.backend.data.FoodRecord">
+    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price
+    FROM records
+    WHERE id = #{id}
+  </select>
+
+  <!-- 記録の登録 -->
+  <insert id="insertRecord" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO records (user_id, item_id, eaten_on, custom_note, review, rating, price)
+    VALUES (#{userId}, #{itemId}, #{eatenOn}, #{customNote}, #{review}, #{rating}, #{price})
+  </insert>
+
+  <!-- 記録の写真のパス（並び順） -->
+  <select id="searchRecordPhotoPaths" resultType="string">
+    SELECT photo_path
+    FROM record_photos
+    WHERE record_id = #{recordId}
+    ORDER BY sort_order
+  </select>
+
+  <!-- 記録の写真をまとめて登録（リストの順番を sort_order にする） -->
+  <insert id="insertRecordPhotos">
+    INSERT INTO record_photos (record_id, photo_path, sort_order)
+    VALUES
+    <foreach collection="photoPaths" item="photoPath" index="index" separator=",">
+      (#{recordId}, #{photoPath}, #{index})
+    </foreach>
+  </insert>
+
+</mapper>

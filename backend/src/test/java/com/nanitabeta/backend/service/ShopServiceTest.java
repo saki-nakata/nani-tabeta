@@ -23,6 +23,7 @@ import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
 import com.nanitabeta.backend.exception.InvalidAreaException;
+import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
@@ -59,6 +60,24 @@ class ShopServiceTest {
 
     assertThatThrownBy(() -> sut.searchShop(999L)).isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("店が見つかりません。id=999");
+  }
+
+  @Test
+  void 紐づける店の取得_リポジトリの結果をそのまま返すこと() {
+    Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShop(1L)).thenReturn(expected);
+
+    Shop actual = sut.searchShopToLink(1L);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 紐づける店の取得_見つからない場合は400用の例外を投げること() {
+    when(repository.searchShop(999L)).thenReturn(null);
+
+    assertThatThrownBy(() -> sut.searchShopToLink(999L)).isInstanceOf(InvalidShopException.class)
+        .hasMessage("指定された店が存在しません。shopId=999");
   }
 
   @Test

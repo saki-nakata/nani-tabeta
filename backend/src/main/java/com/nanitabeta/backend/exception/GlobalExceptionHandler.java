@@ -109,6 +109,34 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 指定された店が存在しない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidShopException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidShop(InvalidShopException ex) {
+    log.warn("存在しない店が指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
+   * 写真のパスが正しくない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidPhotoPathException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidPhotoPath(InvalidPhotoPathException ex) {
+    log.warn("正しくない写真のパスが指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 指定されたデータが見つからない場合の例外を処理します。
    *
    * @param ex 発生した例外

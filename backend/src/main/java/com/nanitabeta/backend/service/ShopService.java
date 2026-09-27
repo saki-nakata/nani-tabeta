@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
+import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 import com.nanitabeta.backend.util.LikeEscaper;
@@ -45,6 +46,23 @@ public class ShopService {
     Shop shop = repository.searchShop(id);
     if (shop == null) {
       throw new ResourceNotFoundException("店が見つかりません。id=" + id);
+    }
+    return shop;
+  }
+
+  /**
+   * 記録などを紐づける先として、リクエストの本文で指定された店を1件取得します。
+   * <p>
+   * URL で指定された店を探す {@link #searchShop} とは違い、見つからない場合は 400 になる例外を投げます。
+   *
+   * @param id 店ID
+   * @return 店
+   * @throws InvalidShopException 店が見つからない場合
+   */
+  public Shop searchShopToLink(Long id) {
+    Shop shop = repository.searchShop(id);
+    if (shop == null) {
+      throw new InvalidShopException("指定された店が存在しません。shopId=" + id);
     }
     return shop;
   }
