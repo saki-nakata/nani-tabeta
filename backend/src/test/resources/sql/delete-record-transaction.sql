@@ -1,0 +1,7 @@
+-- RecordServiceTransactionTest のあと片付け（外部キーの順に消す）
+DELETE FROM record_photos
+WHERE record_id IN (SELECT id FROM (SELECT id FROM records WHERE user_id = '11111111-1111-1111-1111-111111111111') AS target);
+DELETE FROM records WHERE user_id = '11111111-1111-1111-1111-111111111111';
+DELETE FROM items WHERE shop_id = 9001;
+DELETE FROM shops WHERE id = 9001;
+DELETE FROM users WHERE id = '11111111-1111-1111-1111-111111111111';
