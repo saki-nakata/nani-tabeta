@@ -37,7 +37,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_店の商品を商品名順に取得できること() {
     List<Item> actual = sut.searchItemSuggestions(1L, null, 10);
 
@@ -45,7 +45,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_商品が登録されていない店の場合は空のリストを返すこと() {
     List<Item> actual = sut.searchItemSuggestions(3L, null, 10);
 
@@ -53,7 +53,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_キーワードで部分一致の絞り込みができること() {
     List<Item> actual = sut.searchItemSuggestions(1L, "から", 10);
 
@@ -61,7 +61,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_キーワードは濁点と大文字小文字を区別しないこと() {
     List<Item> actual = sut.searchItemSuggestions(1L, "からあけ棒", 10);
 
@@ -69,7 +69,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_該当がない場合は空のリストを返すこと() {
     List<Item> actual = sut.searchItemSuggestions(1L, "ラーメン", 10);
 
@@ -77,7 +77,7 @@ class ItemRepositoryTest {
   }
 
   @Test
-  @Sql("/sql/insert-items.sql")
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_件数の上限を超えないこと() {
     List<Item> actual = sut.searchItemSuggestions(1L, null, 1);
 
@@ -170,5 +170,32 @@ class ItemRepositoryTest {
     sut.updateItem(item);
 
     assertThat(sut.searchItem(1L).getCategoryId()).isEqualTo(8L);
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 商品の候補_記録がない商品は候補に出ないこと() {
+    // 店1の「からあげ串」（id=4）は記録が0件
+    List<Item> actual = sut.searchItemSuggestions(1L, "から", 10);
+
+    assertThat(actual).extracting(Item::getId).containsExactly(1L);
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 記録がない商品は削除されること() {
+    sut.deleteItemIfNoRecords(4L);
+
+    assertThat(sut.searchItem(4L)).isNull();
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 記録がある商品は削除されないこと() {
+    Item expected = sut.searchItem(1L);
+
+    sut.deleteItemIfNoRecords(1L);
+
+    assertThat(sut.searchItem(1L)).isEqualTo(expected);
   }
 }

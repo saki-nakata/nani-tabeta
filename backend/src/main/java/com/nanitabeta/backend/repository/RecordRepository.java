@@ -20,6 +20,16 @@ public interface RecordRepository {
   FoodRecord searchRecord(Long id);
 
   /**
+   * 記録を1件取得し、行ロック（FOR UPDATE）をかけます。
+   * <p>
+   * 編集・削除の前に使います。トランザクションが終わるまで、同じ記録へのほかの編集・削除は待たされます。 普通の読み取り（searchRecord）は待たされません。
+   *
+   * @param id 記録ID
+   * @return 記録（見つからない場合は null）
+   */
+  FoodRecord searchRecordForUpdate(Long id);
+
+  /**
    * 記録を登録します。
    * <p>
    * IDは自動採番で設定されます。
@@ -46,4 +56,31 @@ public interface RecordRepository {
    */
   void insertRecordPhotos(@Param("recordId") Long recordId,
       @Param("photoPaths") List<String> photoPaths);
+
+  /**
+   * 記録を更新します。
+   * <p>
+   * 記録した人（user_id）は変更しません。
+   *
+   * @param record 更新する記録
+   */
+  void updateRecord(FoodRecord record);
+
+  /**
+   * 記録を削除します。
+   * <p>
+   * 記録の写真・いいね・コメントも、外部キー（ON DELETE CASCADE）で一緒に削除されます。
+   *
+   * @param id 記録ID
+   */
+  void deleteRecord(Long id);
+
+  /**
+   * 記録の写真を、すべて削除します。
+   * <p>
+   * 写真の追加・削除・並べ替えは、すべて削除してから入れ直して行います。
+   *
+   * @param recordId 記録ID
+   */
+  void deleteRecordPhotos(Long recordId);
 }

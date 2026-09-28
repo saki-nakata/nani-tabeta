@@ -137,6 +137,20 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 対象は存在するが、操作する権限がない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 403 とエラー内容
+   */
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ErrorMessage> handleForbidden(ForbiddenException ex) {
+    log.warn("権限のない操作が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.FORBIDDEN;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 指定されたデータが見つからない場合の例外を処理します。
    *
    * @param ex 発生した例外

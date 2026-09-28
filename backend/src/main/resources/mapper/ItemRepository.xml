@@ -15,6 +15,7 @@
     SELECT id, shop_id, item_name, category_id, is_seasonal
     FROM items
     WHERE shop_id = #{shopId}
+      AND EXISTS (SELECT 1 FROM records WHERE records.item_id = items.id)
     <if test="keyword != null and keyword != ''">
       AND item_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{keyword}, '%')
     </if>
@@ -51,4 +52,12 @@
         is_seasonal = #{isSeasonal}
     WHERE id = #{id}
   </update>
+
+  <!-- 記録が1件もない商品だけを削除（確認と削除を1つの SQL で行う） -->
+  <delete id="deleteItemIfNoRecords">
+    DELETE FROM items
+    WHERE id = #{id}
+      AND NOT EXISTS (SELECT 1 FROM records WHERE records.item_id = #{id})
+  </delete>
+
 </mapper>

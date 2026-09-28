@@ -18,16 +18,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * 記録の登録で受け取る内容です。
+ * 記録の登録・編集で受け取る内容です。
  * <p>
  * 記録したユーザーは JWT の sub から決めるため、ここでは受け取りません。
  */
-@Schema(description = "記録の登録内容")
+@Schema(description = "記録の登録・編集の内容")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class RecordCreateRequest {
+public class RecordRequest {
 
   @Schema(description = "店ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
   @NotNull(message = "店を選択してください。")
@@ -77,9 +77,9 @@ public class RecordCreateRequest {
   private List<String> photoPaths;
 
   /**
-   * 登録する記録に変換します。
+   * 登録・編集する記録に変換します。
    *
-   * @param userId 記録するユーザーのID（JWT の sub）
+   * @param userId 操作するユーザーのID（JWT の sub）
    * @return 記録（IDと商品IDは未設定）
    */
   public FoodRecord toFoodRecord(String userId) {
