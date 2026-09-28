@@ -82,4 +82,56 @@ class RecordRepositoryTest {
     List<String> actual = sut.searchRecordPhotoPaths(record.getId());
     assertThat(actual).containsExactlyElementsOf(expected);
   }
+
+  @Test
+  @Sql("/sql/insert-record.sql")
+  void 記録を更新できること_記録した人は変わらないこと() {
+    // 本文に別のユーザーIDを入れても、SQL で user_id を更新しないので変わらない
+    FoodRecord record = new FoodRecord(1L, "fa92b95a-22dd-4309-8f76-e53072d5d04c", 1L,
+        LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250);
+    FoodRecord expected = new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), "氷少なめ",
+        "また食べたい", 5, 250);
+
+    sut.updateRecord(record);
+
+    FoodRecord actual = sut.searchRecord(1L);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql("/sql/insert-record.sql")
+  void 記録を削除すると記録の写真も削除されること() {
+    sut.deleteRecord(1L);
+
+    assertThat(sut.searchRecord(1L)).isNull();
+    assertThat(sut.searchRecordPhotoPaths(1L)).isEmpty(); // ON DELETE CASCADE で一緒に消える
+  }
+
+  @Test
+  @Sql("/sql/insert-record.sql")
+  void 記録の写真をすべて削除できること() {
+    sut.deleteRecordPhotos(1L);
+
+    assertThat(sut.searchRecordPhotoPaths(1L)).isEmpty();
+    assertThat(sut.searchRecord(1L)).isNotNull(); // 記録そのものは残る
+  }
+
+  @Test
+  @Sql("/sql/insert-record.sql")
+  void 記録を行ロックをかけて1件取得できること() {
+    // FOR UPDATE が効いているか（同時操作を防げるか）までは、このテストでは確かめられない
+    FoodRecord expected = new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め",
+        "衣がサクサク", 4, 220);
+
+    FoodRecord actual = sut.searchRecordForUpdate(1L);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 行ロックをかけて取得する記録が見つからない場合はnullを返すこと() {
+    FoodRecord actual = sut.searchRecordForUpdate(999L);
+
+    assertThat(actual).isNull();
+  }
 }

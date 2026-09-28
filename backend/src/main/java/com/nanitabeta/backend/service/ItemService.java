@@ -78,8 +78,9 @@ public class ItemService {
    */
   @Transactional
   public Item registerItem(Item input) {
-    Item item = new Item(input.getId(), input.getShopId(),
-        NameNormalizer.normalize(input.getItemName()), input.getCategoryId(), input.getIsSeasonal());
+    Item item =
+        new Item(input.getId(), input.getShopId(), NameNormalizer.normalize(input.getItemName()),
+            input.getCategoryId(), input.getIsSeasonal());
     Item matchedItem = repository.searchItemByShopAndName(item);
     if (matchedItem != null) {
       return matchedItem;
@@ -110,13 +111,25 @@ public class ItemService {
   public Item updateItem(Item input) {
     searchItem(input.getId()); // 存在しない場合は ResourceNotFoundException
     categoryService.searchCategory(input.getCategoryId()); // 存在しない場合は 400
-    Item item = new Item(input.getId(), input.getShopId(),
-        NameNormalizer.normalize(input.getItemName()), input.getCategoryId(), input.getIsSeasonal());
+    Item item =
+        new Item(input.getId(), input.getShopId(), NameNormalizer.normalize(input.getItemName()),
+            input.getCategoryId(), input.getIsSeasonal());
     try {
       repository.updateItem(item);
     } catch (DuplicateKeyException ex) {
       throw new DuplicateItemNameException("同じ商品名の商品が、その店にすでに登録されています。", ex);
     }
     return repository.searchItem(item.getId());
+  }
+
+  /**
+   * 記録が1件もない商品を削除します。
+   * <p>
+   * 記録の付け替え・削除のあとに呼び、使われなくなった商品を消します。記録が残っている場合は何もしません。
+   *
+   * @param id 商品ID
+   */
+  public void deleteItemIfNoRecords(Long id) {
+    repository.deleteItemIfNoRecords(id);
   }
 }

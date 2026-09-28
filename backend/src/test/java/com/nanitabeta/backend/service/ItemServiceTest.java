@@ -212,4 +212,11 @@ class ItemServiceTest {
         .hasMessage("同じ商品名の商品が、その店にすでに登録されています。")
         .hasCauseInstanceOf(DuplicateKeyException.class);
   }
+
+  @Test
+  void 記録がない商品の削除_リポジトリに削除を依頼すること() {
+    sut.deleteItemIfNoRecords(6L);
+
+    verify(repository).deleteItemIfNoRecords(6L);
+  }
 }

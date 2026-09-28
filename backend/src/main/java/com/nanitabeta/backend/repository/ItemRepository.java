@@ -67,4 +67,16 @@ public interface ItemRepository {
    * @param item 更新する商品
    */
   void updateItem(Item item);
+
+  /**
+   * 商品を参照している記録が1件もない場合だけ、商品を削除します。
+   * <p>
+   * 記録の付け替え・削除で使われなくなった商品を消すために使います。 記録が残っている場合は何もしません。
+   * <p>
+   * 商品を参照するテーブル（今は records だけ）が増えた場合は、そのテーブルも条件に加えること。
+   * 加えないと、外部キー違反で削除に失敗する（ON DELETE CASCADE なら参照している行が黙って消える）。
+   *
+   * @param id 商品ID
+   */
+  void deleteItemIfNoRecords(Long id);
 }

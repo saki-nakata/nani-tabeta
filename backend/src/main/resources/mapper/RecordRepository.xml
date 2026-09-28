@@ -10,6 +10,14 @@
     WHERE id = #{id}
   </select>
 
+  <!-- 記録の1件取得（編集・削除の前に使う。行ロックをかけ、最新の確定データを読む） -->
+  <select id="searchRecordForUpdate" resultType="com.nanitabeta.backend.data.FoodRecord">
+    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price
+    FROM records
+    WHERE id = #{id}
+    FOR UPDATE
+  </select>
+
   <!-- 記録の登録 -->
   <insert id="insertRecord" useGeneratedKeys="true" keyProperty="id">
     INSERT INTO records (user_id, item_id, eaten_on, custom_note, review, rating, price)
@@ -32,5 +40,29 @@
       (#{recordId}, #{photoPath}, #{index})
     </foreach>
   </insert>
+
+  <!-- 記録の更新（記録した人は変えない） -->
+  <update id="updateRecord">
+    UPDATE records
+    SET item_id = #{itemId},
+        eaten_on = #{eatenOn},
+        custom_note = #{customNote},
+        review = #{review},
+        rating = #{rating},
+        price = #{price}
+    WHERE id = #{id}
+  </update>
+
+  <!-- 記録の削除（写真・いいね・コメントは ON DELETE CASCADE で一緒に消える） -->
+  <delete id="deleteRecord">
+    DELETE FROM records
+    WHERE id = #{id}
+  </delete>
+
+  <!-- 記録の写真をすべて削除 -->
+  <delete id="deleteRecordPhotos">
+    DELETE FROM record_photos
+    WHERE record_id = #{recordId}
+  </delete>
 
 </mapper>

@@ -6,8 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.time.Clock;
@@ -29,6 +31,7 @@ import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.RecordDetail;
+import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
@@ -72,8 +75,7 @@ class RecordControllerTest {
   }
 
   private static RecordDetail recordDetail(LocalDate eatenOn) {
-    return new RecordDetail(
-        new FoodRecord(1L, USER_ID, 6L, eatenOn, null, "衣がサクサク", 4, 220),
+    return new RecordDetail(new FoodRecord(1L, USER_ID, 6L, eatenOn, null, "衣がサクサク", 4, 220),
         new Item(6L, 2L, "からあげ棒", 4L, false), new Shop(2L, "セブンイレブン", 20L, 1L, false),
         List.of(PHOTO));
   }
@@ -99,8 +101,8 @@ class RecordControllerTest {
     when(service.searchRecordDetail(999L))
         .thenThrow(new ResourceNotFoundException("記録が見つかりません。id=999"));
 
-    mockMvc.perform(get("/api/records/999").with(registeredUser()))
-        .andExpect(status().isNotFound()).andExpect(content().json("""
+    mockMvc.perform(get("/api/records/999").with(registeredUser())).andExpect(status().isNotFound())
+        .andExpect(content().json("""
             {"statusValue": 404, "statusName": "NOT_FOUND", "message": "記録が見つかりません。id=999"}
             """));
   }
@@ -113,8 +115,9 @@ class RecordControllerTest {
         new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220);
     Item expectedItem = new Item(null, 2L, "からあげ棒", 4L, false);
 
-    mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+    mockMvc
+        .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody("\"2020-01-01\"")))
         .andExpect(status().isCreated()).andExpect(content().json("""
             {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01"}}
             """.formatted(USER_ID)));
@@ -145,8 +148,9 @@ class RecordControllerTest {
 
   @Test
   void 記録の登録_明日の日付の場合は400が返ること() throws Exception {
-    mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-02\"")))
+    mockMvc
+        .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody("\"2020-01-02\"")))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "食べた日に未来の日付は指定できません。"}
@@ -157,8 +161,9 @@ class RecordControllerTest {
 
   @Test
   void 記録の登録_食べた日が未入力の場合は400が返ること() throws Exception {
-    mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(requestBody("null")))
+    mockMvc
+        .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody("null")))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "食べた日を入力してください。"}
             """));
@@ -171,8 +176,8 @@ class RecordControllerTest {
     String body = requestBody("\"2020-01-01\"").replace("\"rating\": 4", "\"rating\": 6");
 
     mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(body))
-        .andExpect(status().isBadRequest()).andExpect(content().json("""
+        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest())
+        .andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "評価は1〜5で選択してください。"}
             """));
 
@@ -185,8 +190,8 @@ class RecordControllerTest {
     String body = requestBody("\"2020-01-01\"").replace(PHOTO, sixPhotos);
 
     mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(body))
-        .andExpect(status().isBadRequest()).andExpect(content().json("""
+        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest())
+        .andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "写真は5枚まで登録できます。"}
             """));
 
@@ -198,8 +203,9 @@ class RecordControllerTest {
     when(service.registerRecord(any(), any(), any()))
         .thenThrow(new InvalidShopException("指定された店が存在しません。shopId=2"));
 
-    mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+    mockMvc
+        .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody("\"2020-01-01\"")))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "指定された店が存在しません。shopId=2"}
@@ -211,10 +217,101 @@ class RecordControllerTest {
     when(service.registerRecord(any(), any(), any()))
         .thenThrow(new InvalidPhotoPathException("同じ写真が重複しています。"));
 
-    mockMvc.perform(post("/api/records").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+    mockMvc
+        .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody("\"2020-01-01\"")))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "同じ写真が重複しています。"}
             """));
+  }
+
+  @Test
+  void 記録の編集_JWTのsubを操作する人として編集し200が返ること() throws Exception {
+    LocalDate eatenOn = LocalDate.of(2020, 1, 1);
+    when(service.updateRecord(any(), any(), any(), any())).thenReturn(recordDetail(eatenOn));
+    FoodRecord expectedRecord =
+        new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220);
+    Item expectedItem = new Item(null, 2L, "からあげ棒", 4L, false);
+
+    mockMvc
+        .perform(put("/api/records/1").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+        .andExpect(status().isOk()).andExpect(content().json("""
+            {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01"}}
+            """.formatted(USER_ID)));
+
+    verify(service).updateRecord(1L, expectedRecord, expectedItem, List.of(PHOTO));
+  }
+
+  @Test
+  void 記録の編集_明日の日付の場合は400が返ること() throws Exception {
+    // 登録と同じリクエストを使うので、編集でも未来の日付は断られる
+    mockMvc
+        .perform(put("/api/records/1").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-02\"")))
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "食べた日に未来の日付は指定できません。"}
+            """));
+
+    verify(service, never()).updateRecord(any(), any(), any(), any());
+  }
+
+  @Test
+  void 記録の編集_他人の記録の場合は403が返ること() throws Exception {
+    when(service.updateRecord(any(), any(), any(), any()))
+        .thenThrow(new ForbiddenException("この記録を変更する権限がありません。id=3"));
+
+    mockMvc
+        .perform(put("/api/records/3").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+        .andExpect(status().isForbidden()).andExpect(content().json("""
+            {"statusValue": 403, "statusName": "FORBIDDEN",
+             "message": "この記録を変更する権限がありません。id=3"}
+            """));
+  }
+
+  @Test
+  void 記録の編集_記録が見つからない場合は404が返ること() throws Exception {
+    when(service.updateRecord(any(), any(), any(), any()))
+        .thenThrow(new ResourceNotFoundException("記録が見つかりません。id=999"));
+
+    mockMvc
+        .perform(put("/api/records/999").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void 記録の削除_削除した写真のパスが返ること() throws Exception {
+    when(service.deleteRecord(1L, USER_ID)).thenReturn(List.of(PHOTO));
+
+    mockMvc.perform(delete("/api/records/1").with(registeredUser())).andExpect(status().isOk())
+        .andExpect(content().json("""
+            {"deletedPhotoPaths": ["%s"]}
+            """.formatted(PHOTO)));
+
+    verify(service).deleteRecord(1L, USER_ID); // JWT の sub で削除すること
+  }
+
+  @Test
+  void 記録の削除_他人の記録の場合は403が返ること() throws Exception {
+    when(service.deleteRecord(3L, USER_ID))
+        .thenThrow(new ForbiddenException("この記録を変更する権限がありません。id=3"));
+
+    mockMvc.perform(delete("/api/records/3").with(registeredUser()))
+        .andExpect(status().isForbidden()).andExpect(content().json("""
+            {"statusValue": 403, "statusName": "FORBIDDEN",
+             "message": "この記録を変更する権限がありません。id=3"}
+            """));
+  }
+
+  @Test
+  void 記録の削除_記録が見つからない場合は404が返ること() throws Exception {
+    when(service.deleteRecord(999L, USER_ID))
+        .thenThrow(new ResourceNotFoundException("記録が見つかりません。id=999"));
+
+    mockMvc.perform(delete("/api/records/999").with(registeredUser()))
+        .andExpect(status().isNotFound());
   }
 }
