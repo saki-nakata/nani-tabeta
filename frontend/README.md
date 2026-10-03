@@ -9,12 +9,12 @@ Next.js 16 (App Router) / TypeScript / Tailwind CSS v4。
 
 パッケージマネージャは **pnpm** です（`package.json` の `packageManager` で固定）。
 
-| 目的 | コマンド |
-|---|---|
+| 目的                   | コマンド       |
+| ---------------------- | -------------- |
 | 依存関係のインストール | `pnpm install` |
-| 開発サーバー | `pnpm dev` |
-| 静的検査 | `pnpm lint` |
-| 本番ビルド | `pnpm build` |
+| 開発サーバー           | `pnpm dev`     |
+| 静的検査               | `pnpm lint`    |
+| 本番ビルド             | `pnpm build`   |
 
 ## ディレクトリ
 
