@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { compressToWebp } from "@/lib/photos/compress";
-
-const BUCKET = "photos";
+import { PHOTO_BUCKET } from "@/lib/photos/bucket";
 
 export type PhotoFolder = "records" | "shops";
 
@@ -29,7 +28,7 @@ export async function uploadPhoto(
 
   const path = `${data.claims.sub}/${folder}/${crypto.randomUUID()}.webp`;
   const { error } = await supabase.storage
-    .from(BUCKET)
+    .from(PHOTO_BUCKET)
     .upload(path, photo, { contentType: "image/webp" });
 
   if (error) {
@@ -63,7 +62,9 @@ export async function deletePhotos(paths: string[]): Promise<void> {
   }
   try {
     const supabase = createClient();
-    const { data, error } = await supabase.storage.from(BUCKET).remove(paths);
+    const { data, error } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .remove(paths);
     const deleted = new Set(data?.map((deletedPhoto) => deletedPhoto.name));
     const remaining = paths.filter((path) => !deleted.has(path));
     if (remaining.length > 0) {

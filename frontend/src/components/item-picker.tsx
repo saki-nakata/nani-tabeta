@@ -37,7 +37,7 @@ type ItemPickerProps = {
   categories: Category[];
   // 候補から選んだ登録済みの商品（選んでいなければ null）
   selectedItem: Item | null;
-  onSelect: (item: Item | null) => void;
+  onSelectedItemChange: (item: Item | null) => void;
   newItem: NewItem;
   onNewItemChange: (newItem: NewItem) => void;
 };
@@ -46,7 +46,7 @@ export function ItemPicker({
   shopId,
   categories,
   selectedItem,
-  onSelect,
+  onSelectedItemChange,
   newItem,
   onNewItemChange,
 }: ItemPickerProps) {
@@ -101,7 +101,7 @@ export function ItemPicker({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => onSelect(null)}
+            onClick={() => onSelectedItemChange(null)}
           >
             変更
           </Button>
@@ -145,7 +145,7 @@ export function ItemPicker({
             <button
               type="button"
               className="w-full rounded-md px-2.5 py-1.5 text-left hover:bg-muted"
-              onClick={() => onSelect(suggestion)}
+              onClick={() => onSelectedItemChange(suggestion)}
             >
               {suggestion.itemName}
             </button>

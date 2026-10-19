@@ -17,6 +17,29 @@ import {
 } from "@/components/item-picker";
 import type { Item } from "@/types/item";
 import { normalizePrice } from "@/lib/price";
+import {
+  confirmItemToSend,
+  validateRecordForm,
+} from "@/app/records/new/validate";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import {
+  registerNewShop,
+  submitRecord,
+  type RegisterNewShopResult,
+  type SubmitRecordResult,
+} from "@/app/records/new/actions";
+import { deletePhotos, uploadPhotos } from "@/lib/photos/upload";
+
+// 店を登録できなかったときの案内
+const SHOP_FAILED_MESSAGE =
+  "店を登録できませんでした。時間をおいて、もう一度「記録する」を押してください。";
+// 写真を置けなかったときの案内
+const PHOTO_FAILED_MESSAGE =
+  "写真をアップロードできませんでした。写真の容量が大きすぎるか、通信が不安定な可能性があります。別の写真を選ぶか、時間をおいてもう一度「記録する」を押してください。";
+// 記録できたか確かめられなかったときの案内（もう一度押すと重複しうることも伝える）
+const UNKNOWN_RECORD_MESSAGE =
+  "記録できたか確認できませんでした。すでに登録されている可能性があります。もう一度「記録する」を押すと、同じ記録が重複することがあります。";
 
 type RecordFormProps = {
   today: string;
@@ -33,6 +56,8 @@ export function RecordForm({
   categories,
   initialAreaId,
 }: RecordFormProps) {
+  const router = useRouter();
+
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [areaId, setAreaId] = useState(initialAreaId);
   const [selectedShop, setSelectedShop] = useState<SelectedShop | null>(null);
@@ -42,6 +67,10 @@ export function RecordForm({
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [price, setPrice] = useState("");
+  // 「記録する」を押したときの案内（足りないもの・失敗の理由）
+  const [errorMessages, setErrorMessages] = useState<string[]>([]);
+  // 確かめている・送っている途中か（その間は入力もボタンも押せなくする）
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [customNote, setCustomNote] = useState("");
   const [editPrice, setEditPrice] = useState(false);
 
@@ -49,6 +78,114 @@ export function RecordForm({
   function clearItem() {
     setSelectedItem(null);
     setNewItem(EMPTY_NEW_ITEM);
+  }
+
+  // 「記録する」を押したとき
+  async function handleSubmit() {
+    setIsSubmitting(true);
+    setErrorMessages([]);
+    const messages = await sendRecord();
+    // 止まったときだけ、案内を出して押せる状態に戻す
+    // 成功したときは、詳細画面へ移るまで押せないままにする（二重に登録しないように）
+    if (messages.length > 0) {
+      setErrorMessages(messages);
+      setIsSubmitting(false);
+    }
+  }
+
+  // 入力を確かめて、店の登録 → 写真のアップロード → 記録の登録 を行う
+  // 成功したら詳細画面へ移って空の配列を返す。途中で止まったら、案内を返す
+  async function sendRecord(): Promise<string[]> {
+    // ① 入力がそろっているか
+    const messages = validateRecordForm({
+      selectedShop,
+      selectedItem,
+      newItem,
+      rating,
+      eatenOn,
+      today,
+    });
+    if (messages.length > 0) {
+      return messages;
+    }
+    // ここで確かめると、この先は店もエリアもあると TypeScript に伝わる（店があれば、エリアも必ずある）
+    if (selectedShop === null || areaId === null) {
+      return ["店を選んでください。"];
+    }
+
+    // ② 送る商品を決める（候補を選んでいなければ、もう一度探して確かめる）
+    const itemToSendResult = await confirmItemToSend({
+      selectedShop,
+      selectedItem,
+      newItem,
+    });
+    if (!itemToSendResult.isConfirmed) {
+      return [itemToSendResult.message];
+    }
+
+    // ③ 新しい店なら、店を登録して ID をもらう（同じ店名・エリアの店があれば、その店の ID が返る）
+    let shopId: number;
+    if (selectedShop.type === "registered") {
+      shopId = selectedShop.shop.id;
+    } else {
+      let shopResult: RegisterNewShopResult;
+      try {
+        shopResult = await registerNewShop({
+          shopName: selectedShop.shopName,
+          areaId,
+          shopKindId: selectedShop.shopKindId,
+        });
+      } catch {
+        // 返事が届かなかった（まだ写真は置いていないので、後片付けはない）
+        return [SHOP_FAILED_MESSAGE];
+      }
+      if (!shopResult.isSuccess) {
+        return [SHOP_FAILED_MESSAGE];
+      }
+      shopId = shopResult.shop.id;
+    }
+
+    // ④ 写真を縮めて置く（途中で失敗したら、uploadPhotos が置いた分の削除を試みてから投げる）
+    let photoPaths: string[];
+    try {
+      photoPaths = await uploadPhotos(
+        photos.map((photo) => photo.file),
+        "records",
+      );
+    } catch {
+      return [PHOTO_FAILED_MESSAGE];
+    }
+
+    // ⑤ 記録を登録する
+    const normalizedPrice = normalizePrice(price);
+    let recordResult: SubmitRecordResult;
+    try {
+      recordResult = await submitRecord({
+        shopId,
+        ...itemToSendResult.item,
+        eatenOn,
+        rating,
+        review: review.trim() === "" ? null : review,
+        customNote: customNote.trim() === "" ? null : customNote,
+        price: normalizedPrice === "" ? null : Number(normalizedPrice),
+        photoPaths,
+      });
+    } catch {
+      // 返事が届かなかった：登録されたかわからないので、写真は消さない
+      return [UNKNOWN_RECORD_MESSAGE];
+    }
+    if (recordResult.status === "failed") {
+      // 確実に登録されていないので、置いた写真の削除を試みる（消せなかった分は、日次バッチで片付ける予定。まだ作っていない）
+      await deletePhotos(photoPaths);
+      return [recordResult.message];
+    }
+    if (recordResult.status === "unknown") {
+      return [UNKNOWN_RECORD_MESSAGE];
+    }
+
+    // ⑥ 詳細画面へ移る（移れなくても登録は成功しているので、写真は消さず、押せないままにする）
+    router.push(`/records/${recordResult.recordId}`);
+    return [];
   }
 
   // 画面を離れるときに片付けられるよう、今の写真の一覧を控えておく
@@ -68,7 +205,10 @@ export function RecordForm({
   );
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
+    <fieldset
+      disabled={isSubmitting}
+      className="flex w-full max-w-md min-w-0 flex-col gap-6"
+    >
       <PhotoPicker photos={photos} onChange={setPhotos} />
       <AreaPicker
         regionDetails={regionDetails}
@@ -108,7 +248,7 @@ export function RecordForm({
           }
           categories={categories}
           selectedItem={selectedItem}
-          onSelect={setSelectedItem}
+          onSelectedItemChange={setSelectedItem}
           newItem={newItem}
           onNewItemChange={setNewItem}
         />
@@ -179,6 +319,19 @@ export function RecordForm({
           {customNote.length} / 500
         </p>
       </div>
-    </div>
+      {errorMessages.length > 0 && (
+        <ul
+          role="alert"
+          className="flex flex-col gap-1 text-sm text-destructive"
+        >
+          {errorMessages.map((message) => (
+            <li key={message}>{message}</li>
+          ))}
+        </ul>
+      )}
+      <Button type="button" onClick={handleSubmit}>
+        {isSubmitting ? "記録しています…" : "記録する"}
+      </Button>
+    </fieldset>
   );
 }
