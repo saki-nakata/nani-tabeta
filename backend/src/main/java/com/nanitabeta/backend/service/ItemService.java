@@ -59,11 +59,13 @@ public class ItemService {
   public List<Item> searchItemSuggestions(Long shopId, String keyword) {
     shopService.searchShop(shopId); // 存在しない場合は ResourceNotFoundException
 
-    String condition = null;
+    String sameKeyword = null; // 完全一致用
+    String likeKeyword = null; // 部分一致用
     if (keyword != null) {
-      condition = LikeEscaper.escape(NameNormalizer.normalize(keyword));
+      sameKeyword = NameNormalizer.normalize(keyword);
+      likeKeyword = LikeEscaper.escape(sameKeyword);
     }
-    return repository.searchItemSuggestions(shopId, condition, SUGGESTION_LIMIT);
+    return repository.searchItemSuggestions(shopId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
   }
 
   /**

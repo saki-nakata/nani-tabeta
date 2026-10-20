@@ -60,12 +60,18 @@ public interface ShopRepository {
    * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
    * <p>
    * キーワードの比較は濁点と大文字小文字を区別しません（取りこぼしを避けるため）。
+   * <p>
+   * 店名がキーワードと完全に一致する店（比較は店名の列の照合順序に従う）は、件数の上限に関係なく先頭に並べます。 残りは店名順です。
+   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる店が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。
+   * その場合も、完全一致する店は候補に含めます。
    *
    * @param areaId エリアID
-   * @param keyword 店名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
+   * @param likeKeyword 店名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
+   * @param sameKeyword 先頭に並べる店名（正規化済み・エスケープ前。null または空文字の場合は先頭に並べない）
    * @param limit 取得する最大件数
    * @return 店の一覧（該当がない場合は空のリスト）
    */
-  List<Shop> searchShopSuggestions(@Param("areaId") Long areaId, @Param("keyword") String keyword,
+  List<Shop> searchShopSuggestions(@Param("areaId") Long areaId,
+      @Param("likeKeyword") String likeKeyword, @Param("sameKeyword") String sameKeyword,
       @Param("limit") int limit);
 }

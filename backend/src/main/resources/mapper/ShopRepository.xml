@@ -41,16 +41,25 @@
     WHERE id = #{id}
   </update>
 
-  <!-- エリア内の店の候補（閉店を除く。キーワードは濁点・大文字小文字を区別せずに部分一致） -->
+  <!-- エリア内の店の候補（閉店を除く。キーワードは濁点・大文字小文字を区別せずに部分一致、または店名が完全に一致。完全に同じ店名を先頭に並べる） -->
   <select id="searchShopSuggestions" resultType="com.nanitabeta.backend.data.Shop">
     SELECT id, shop_name, area_id, shop_kind_id, is_closed
     FROM shops
     WHERE area_id = #{areaId}
       AND is_closed = FALSE
-    <if test="keyword != null and keyword != ''">
-      AND shop_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{keyword}, '%')
+    <if test="likeKeyword != null and likeKeyword != ''">
+      AND (
+        shop_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{likeKeyword}, '%')
+        <if test="sameKeyword != null and sameKeyword != ''">
+          OR shop_name = #{sameKeyword}
+        </if>
+      )
     </if>
-    ORDER BY shop_name
+    ORDER BY
+    <if test="sameKeyword != null and sameKeyword != ''">
+      shop_name = #{sameKeyword} DESC,
+    </if>
+      shop_name
     LIMIT #{limit}
   </select>
 

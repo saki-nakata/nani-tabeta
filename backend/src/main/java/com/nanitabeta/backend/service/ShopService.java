@@ -134,10 +134,12 @@ public class ShopService {
    */
   public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
     areaService.searchArea(areaId); // 存在しない場合は InvalidAreaException
-    String condition = null;
+    String sameKeyword = null; // 完全一致用
+    String likeKeyword = null; // 部分一致用
     if (keyword != null) {
-      condition = LikeEscaper.escape(NameNormalizer.normalize(keyword));
+      sameKeyword = NameNormalizer.normalize(keyword);
+      likeKeyword = LikeEscaper.escape(sameKeyword);
     }
-    return repository.searchShopSuggestions(areaId, condition, SUGGESTION_LIMIT);
+    return repository.searchShopSuggestions(areaId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
   }
 }
