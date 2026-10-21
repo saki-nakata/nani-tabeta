@@ -1,6 +1,8 @@
 package com.nanitabeta.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.nanitabeta.backend.data.FoodRecord;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -8,7 +10,6 @@ import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.test.context.jdbc.Sql;
-import com.nanitabeta.backend.data.FoodRecord;
 
 @MybatisTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -22,8 +23,8 @@ class RecordRepositoryTest {
   @Test
   @Sql("/sql/insert-record.sql")
   void 記録を1件取得できること() {
-    FoodRecord expected = new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め",
-        "衣がサクサク", 4, 220);
+    FoodRecord expected =
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220);
 
     FoodRecord actual = sut.searchRecord(1L);
 
@@ -89,8 +90,8 @@ class RecordRepositoryTest {
     // 本文に別のユーザーIDを入れても、SQL で user_id を更新しないので変わらない
     FoodRecord record = new FoodRecord(1L, "fa92b95a-22dd-4309-8f76-e53072d5d04c", 1L,
         LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250);
-    FoodRecord expected = new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), "氷少なめ",
-        "また食べたい", 5, 250);
+    FoodRecord expected =
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250);
 
     sut.updateRecord(record);
 
@@ -120,8 +121,8 @@ class RecordRepositoryTest {
   @Sql("/sql/insert-record.sql")
   void 記録を行ロックをかけて1件取得できること() {
     // FOR UPDATE が効いているか（同時操作を防げるか）までは、このテストでは確かめられない
-    FoodRecord expected = new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め",
-        "衣がサクサク", 4, 220);
+    FoodRecord expected =
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220);
 
     FoodRecord actual = sut.searchRecordForUpdate(1L);
 

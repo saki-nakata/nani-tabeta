@@ -1,14 +1,14 @@
 package com.nanitabeta.backend.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import com.nanitabeta.backend.data.User;
 import com.nanitabeta.backend.exception.DuplicateUserException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.UserRepository;
 import com.nanitabeta.backend.util.NameNormalizer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ユーザーを扱うサービスです。

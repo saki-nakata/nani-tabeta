@@ -1,7 +1,7 @@
 package com.nanitabeta.backend.repository;
 
-import org.apache.ibatis.annotations.Mapper;
 import com.nanitabeta.backend.data.User;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * ユーザーを扱うリポジトリです。

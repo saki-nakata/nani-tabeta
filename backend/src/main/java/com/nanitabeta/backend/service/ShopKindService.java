@@ -1,11 +1,11 @@
 package com.nanitabeta.backend.service;
 
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import com.nanitabeta.backend.data.ShopKind;
 import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.repository.ShopKindRepository;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 /**
  * 業態マスタを扱うサービスです。

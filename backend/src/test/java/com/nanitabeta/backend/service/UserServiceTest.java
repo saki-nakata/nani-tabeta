@@ -6,16 +6,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.nanitabeta.backend.data.User;
+import com.nanitabeta.backend.exception.DuplicateUserException;
+import com.nanitabeta.backend.exception.ResourceNotFoundException;
+import com.nanitabeta.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
-import com.nanitabeta.backend.data.User;
-import com.nanitabeta.backend.exception.DuplicateUserException;
-import com.nanitabeta.backend.exception.ResourceNotFoundException;
-import com.nanitabeta.backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {

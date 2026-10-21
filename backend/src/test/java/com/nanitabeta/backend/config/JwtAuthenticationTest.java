@@ -6,6 +6,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.nanitabeta.backend.controller.CategoryController;
+import com.nanitabeta.backend.data.User;
+import com.nanitabeta.backend.repository.UserRepository;
+import com.nanitabeta.backend.service.CategoryService;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jose.jwk.Curve;
+import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -23,28 +39,12 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.nanitabeta.backend.controller.CategoryController;
-import com.nanitabeta.backend.data.User;
-import com.nanitabeta.backend.repository.UserRepository;
-import com.nanitabeta.backend.service.CategoryService;
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import com.sun.net.httpserver.HttpServer;
 
 /**
  * 本物と同じ形の JWT を送り、application.yaml の設定どおりに検証されることを確かめるテストです。
  * <p>
- * Supabase の代わりに、テストの中で鍵を作り、公開鍵（JWKS）を配る小さなサーバーを起動します。
- * SUPABASE_URL をそのサーバーに向けるので、issuer-uri・jwk-set-uri・audiences・jws-algorithms は
- * application.yaml に書いた値がそのまま使われます。
+ * Supabase の代わりに、テストの中で鍵を作り、公開鍵（JWKS）を配る小さなサーバーを起動します。 SUPABASE_URL
+ * をそのサーバーに向けるので、issuer-uri・jwk-set-uri・audiences・jws-algorithms は application.yaml に書いた値がそのまま使われます。
  */
 @WebMvcTest(CategoryController.class)
 @Import(SecurityConfig.class)

@@ -1,13 +1,13 @@
 package com.nanitabeta.backend.controller.converter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.nanitabeta.backend.data.Area;
+import com.nanitabeta.backend.data.Region;
+import com.nanitabeta.backend.domain.RegionDetail;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.nanitabeta.backend.data.Area;
-import com.nanitabeta.backend.data.Region; // javax.swing の Region を選ばないこと
-import com.nanitabeta.backend.domain.RegionDetail;
-
 
 class AreaConverterTest {
 

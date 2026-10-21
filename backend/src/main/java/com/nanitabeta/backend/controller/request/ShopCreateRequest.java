@@ -42,4 +42,3 @@ public class ShopCreateRequest {
     return new Shop(null, shopName, areaId, shopKindId, null);
   }
 }
-

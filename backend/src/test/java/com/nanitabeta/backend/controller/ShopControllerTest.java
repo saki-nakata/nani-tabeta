@@ -1,23 +1,16 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import java.util.List;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+
 import com.nanitabeta.backend.config.SecurityConfig;
 import com.nanitabeta.backend.config.UserAuthenticationConverter;
 import com.nanitabeta.backend.data.Shop;
@@ -27,6 +20,14 @@ import com.nanitabeta.backend.exception.InvalidAreaException;
 import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.ShopService;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ShopController.class)
 @Import(SecurityConfig.class)
@@ -71,10 +72,10 @@ class ShopControllerTest {
 
     mockMvc.perform(post("/api/shops").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
-        """)).andExpect(status().isCreated()).andExpect(content().json("""
-        {"id": 1, "shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1, "isClosed": false}
-        """));
+            {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
+            """)).andExpect(status().isCreated()).andExpect(content().json("""
+            {"id": 1, "shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1, "isClosed": false}
+            """));
     verify(service).registerShop(any());
   }
 
@@ -85,10 +86,10 @@ class ShopControllerTest {
 
     mockMvc.perform(post("/api/shops").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
-        """)).andExpect(status().isOk()).andExpect(content().json("""
-        {"id": 1, "shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1, "isClosed": false}
-        """));
+            {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1}
+            """)).andExpect(status().isOk()).andExpect(content().json("""
+            {"id": 1, "shopName": "セブンイレブン", "areaId": 27, "shopKindId": 1, "isClosed": false}
+            """));
     verify(service).registerShop(any());
   }
 
@@ -96,10 +97,10 @@ class ShopControllerTest {
   void 店の登録_店名が空の場合は400が返ること() throws Exception {
     mockMvc.perform(post("/api/shops").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "", "areaId": 27, "shopKindId": 1}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
-        {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "店名を入力してください。"}
-        """));
+            {"shopName": "", "areaId": 27, "shopKindId": 1}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "店名を入力してください。"}
+            """));
 
     verify(service, never()).registerShop(any());
   }
@@ -109,8 +110,9 @@ class ShopControllerTest {
     when(service.searchShopSuggestions(20L, "スター"))
         .thenReturn(List.of(new Shop(1L, "スターバックス", 20L, 9L, false)));
 
-    mockMvc.perform(get("/api/shops/suggestions").with(registeredUser())
-        .param("areaId", "20").param("keyword", "スター"))
+    mockMvc
+        .perform(get("/api/shops/suggestions").with(registeredUser()).param("areaId", "20")
+            .param("keyword", "スター"))
         .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(content().json("""
             [{"id": 1, "shopName": "スターバックス", "areaId": 20, "shopKindId": 9, "isClosed": false}]
@@ -122,8 +124,7 @@ class ShopControllerTest {
   @Test
   void 店の候補の取得_エリアIDがない場合は400が返ること() throws Exception {
     mockMvc.perform(get("/api/shops/suggestions").with(registeredUser()))
-        .andExpect(status().isBadRequest())
-        .andExpect(content().json("""
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "リクエストのパラメータが正しくありません。"}
             """));
@@ -136,11 +137,13 @@ class ShopControllerTest {
     Shop expected = new Shop(1L, "スタバ", 13L, 1L, true);
     when(service.updateShop(any())).thenReturn(expected);
 
-    mockMvc.perform(put("/api/shops/1").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
-        """)).andExpect(status().isOk())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(content().json("""
+    mockMvc
+        .perform(put("/api/shops/1").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
+                """))
+        .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().json("""
             {"id": 1, "shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
             """));
 
@@ -153,35 +156,35 @@ class ShopControllerTest {
 
     mockMvc.perform(put("/api/shops/999").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
-        """)).andExpect(status().isNotFound()).andExpect(content().json("""
-        {"statusValue": 404, "statusName": "NOT_FOUND", "message": "店が見つかりません。id=999"}
-        """));
+            {"shopName": "スタバ", "areaId": 13, "shopKindId": 1, "isClosed": true}
+            """)).andExpect(status().isNotFound()).andExpect(content().json("""
+            {"statusValue": 404, "statusName": "NOT_FOUND", "message": "店が見つかりません。id=999"}
+            """));
   }
 
   @Test
   void 店の更新_店名が重複する場合は409が返ること() throws Exception {
-    when(service.updateShop(any())).thenThrow(
-        new DuplicateShopNameException("同じ店名の店が、そのエリアにすでに登録されています。"));
+    when(service.updateShop(any()))
+        .thenThrow(new DuplicateShopNameException("同じ店名の店が、そのエリアにすでに登録されています。"));
 
     mockMvc.perform(put("/api/shops/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1, "isClosed": false}
-        """)).andExpect(status().isConflict()).andExpect(content().json("""
-        {"statusValue": 409, "statusName": "CONFLICT",
-         "message": "同じ店名の店が、そのエリアにすでに登録されています。"}
-        """));
+            {"shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1, "isClosed": false}
+            """)).andExpect(status().isConflict()).andExpect(content().json("""
+            {"statusValue": 409, "statusName": "CONFLICT",
+             "message": "同じ店名の店が、そのエリアにすでに登録されています。"}
+            """));
   }
 
   @Test
   void 店の更新_閉店したかが未指定の場合は400が返ること() throws Exception {
     mockMvc.perform(put("/api/shops/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "スタバ", "areaId": 13, "shopKindId": 1}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
-        {"statusValue": 400, "statusName": "BAD_REQUEST",
-         "message": "閉店したかどうかを指定してください。"}
-        """));
+            {"shopName": "スタバ", "areaId": 13, "shopKindId": 1}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "閉店したかどうかを指定してください。"}
+            """));
 
     verify(service, never()).updateShop(any());
   }
@@ -204,8 +207,8 @@ class ShopControllerTest {
 
     mockMvc.perform(post("/api/shops").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 999}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"shopName": "セブンイレブン", "areaId": 27, "shopKindId": 999}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "指定された業態が存在しません。shopKindId=999"}
             """));

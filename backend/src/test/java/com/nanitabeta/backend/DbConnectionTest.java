@@ -1,6 +1,7 @@
 package com.nanitabeta.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import java.sql.Connection;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;

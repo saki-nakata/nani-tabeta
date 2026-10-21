@@ -12,13 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import java.util.List;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DuplicateKeyException;
+
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
@@ -27,6 +21,13 @@ import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 @ExtendWith(MockitoExtension.class)
 class ShopServiceTest {
@@ -172,10 +173,8 @@ class ShopServiceTest {
     when(repository.searchShop(1L)).thenReturn(expected);
     doThrow(new DuplicateKeyException("重複")).when(repository).updateShop(any());
 
-    assertThatThrownBy(() -> sut.updateShop(shop))
-        .isInstanceOf(DuplicateShopNameException.class)
-        .hasMessage("同じ店名の店が、そのエリアにすでに登録されています。")
-        .hasCauseInstanceOf(DuplicateKeyException.class);
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(DuplicateShopNameException.class)
+        .hasMessage("同じ店名の店が、そのエリアにすでに登録されています。").hasCauseInstanceOf(DuplicateKeyException.class);
   }
 
   @Test
@@ -192,8 +191,7 @@ class ShopServiceTest {
   void 店の候補_キーワードを正規化してから渡すこと() {
     sut.searchShopSuggestions(20L, "　スター　バックス　"); // 前後と途中に全角スペース
 
-    verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), eq("スター バックス"),
-        anyInt());
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), eq("スター バックス"), anyInt());
   }
 
   @Test
@@ -249,8 +247,8 @@ class ShopServiceTest {
   @Test
   void 店の登録_業態が存在しない場合は例外を投げて登録しないこと() {
     Shop shop = new Shop(null, "スターバックス", 20L, 999L, null);
-    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999"))
-        .when(shopKindService).searchShopKind(999L);
+    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999")).when(shopKindService)
+        .searchShopKind(999L);
 
     assertThatThrownBy(() -> sut.registerShop(shop)).isInstanceOf(InvalidShopKindException.class)
         .hasMessage("指定された業態が存在しません。shopKindId=999");
@@ -278,8 +276,8 @@ class ShopServiceTest {
     Shop shop = new Shop(1L, "スターバックス", 20L, 999L, false);
     Shop expected = new Shop(1L, "スターバックス", 20L, 9L, false);
     when(repository.searchShop(1L)).thenReturn(expected);
-    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999"))
-        .when(shopKindService).searchShopKind(999L);
+    doThrow(new InvalidShopKindException("指定された業態が存在しません。shopKindId=999")).when(shopKindService)
+        .searchShopKind(999L);
 
     assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(InvalidShopKindException.class)
         .hasMessage("指定された業態が存在しません。shopKindId=999");
@@ -293,8 +291,7 @@ class ShopServiceTest {
         .searchArea(999L);
 
     assertThatThrownBy(() -> sut.searchShopSuggestions(999L, null))
-        .isInstanceOf(InvalidAreaException.class)
-        .hasMessage("指定されたエリアが存在しません。areaId=999");
+        .isInstanceOf(InvalidAreaException.class).hasMessage("指定されたエリアが存在しません。areaId=999");
 
     verify(repository, never()).searchShopSuggestions(any(), any(), any(), anyInt());
   }

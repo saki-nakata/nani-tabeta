@@ -2,10 +2,11 @@ package com.nanitabeta.backend.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 
 class PhotoPathValidatorTest {
 
@@ -95,8 +96,7 @@ class PhotoPathValidatorTest {
 
     assertThatThrownBy(
         () -> PhotoPathValidator.validate(USER_ID, PhotoPathValidator.RECORDS, photoPaths))
-        .isInstanceOf(InvalidPhotoPathException.class)
-        .hasMessage("写真の保存場所が正しくありません。path=null");
+        .isInstanceOf(InvalidPhotoPathException.class).hasMessage("写真の保存場所が正しくありません。path=null");
   }
 
   @Test

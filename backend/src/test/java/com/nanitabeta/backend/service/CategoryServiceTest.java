@@ -5,15 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.nanitabeta.backend.data.Category;
+import com.nanitabeta.backend.exception.InvalidCategoryException;
+import com.nanitabeta.backend.repository.CategoryRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.nanitabeta.backend.data.Category;
-import com.nanitabeta.backend.exception.InvalidCategoryException;
-import com.nanitabeta.backend.repository.CategoryRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
@@ -49,8 +50,7 @@ class CategoryServiceTest {
   void 分類の取得_見つからない場合は例外を投げること() {
     when(repository.searchCategory(999L)).thenReturn(null);
 
-    assertThatThrownBy(() -> sut.searchCategory(999L))
-        .isInstanceOf(InvalidCategoryException.class)
+    assertThatThrownBy(() -> sut.searchCategory(999L)).isInstanceOf(InvalidCategoryException.class)
         .hasMessage("指定された分類が存在しません。categoryId=999");
   }
 }

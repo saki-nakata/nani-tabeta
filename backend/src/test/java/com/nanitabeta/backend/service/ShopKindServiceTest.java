@@ -5,15 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.nanitabeta.backend.data.ShopKind;
+import com.nanitabeta.backend.exception.InvalidShopKindException;
+import com.nanitabeta.backend.repository.ShopKindRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.nanitabeta.backend.data.ShopKind;
-import com.nanitabeta.backend.exception.InvalidShopKindException;
-import com.nanitabeta.backend.repository.ShopKindRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ShopKindServiceTest {
@@ -49,8 +50,7 @@ class ShopKindServiceTest {
   void 業態の取得_見つからない場合は例外を投げること() {
     when(repository.searchShopKind(999L)).thenReturn(null);
 
-    assertThatThrownBy(() -> sut.searchShopKind(999L))
-        .isInstanceOf(InvalidShopKindException.class)
+    assertThatThrownBy(() -> sut.searchShopKind(999L)).isInstanceOf(InvalidShopKindException.class)
         .hasMessage("指定された業態が存在しません。shopKindId=999");
   }
 }

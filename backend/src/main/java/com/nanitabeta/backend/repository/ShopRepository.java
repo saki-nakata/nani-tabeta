@@ -1,9 +1,9 @@
 package com.nanitabeta.backend.repository;
 
+import com.nanitabeta.backend.data.Shop;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import com.nanitabeta.backend.data.Shop;
 
 /**
  * 店を扱うリポジトリです。
@@ -62,8 +62,7 @@ public interface ShopRepository {
    * キーワードの比較は濁点と大文字小文字を区別しません（取りこぼしを避けるため）。
    * <p>
    * 店名がキーワードと完全に一致する店（比較は店名の列の照合順序に従う）は、件数の上限に関係なく先頭に並べます。 残りは店名順です。
-   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる店が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。
-   * その場合も、完全一致する店は候補に含めます。
+   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる店が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。 その場合も、完全一致する店は候補に含めます。
    *
    * @param areaId エリアID
    * @param likeKeyword 店名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）

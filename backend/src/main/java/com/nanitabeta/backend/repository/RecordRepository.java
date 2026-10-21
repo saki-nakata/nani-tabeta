@@ -1,9 +1,9 @@
 package com.nanitabeta.backend.repository;
 
+import com.nanitabeta.backend.data.FoodRecord;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import com.nanitabeta.backend.data.FoodRecord;
 
 /**
  * 記録を扱うリポジトリです。

@@ -1,8 +1,8 @@
 package com.nanitabeta.backend.repository;
 
+import com.nanitabeta.backend.data.ShopKind;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
-import com.nanitabeta.backend.data.ShopKind;
 
 /**
  * 業態マスタを扱うリポジトリです。
@@ -25,4 +25,3 @@ public interface ShopKindRepository {
    */
   ShopKind searchShopKind(Long id);
 }
-

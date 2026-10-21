@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.8'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'com.diffplug.spotless' version '8.10.4'
 }
 
 group = 'com.nanitabeta'
@@ -46,4 +47,32 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
+}
+
+// Java の整形（Google スタイルの Eclipse 用 XML。config/README.md に取得元を記録）
+spotless {
+	java {
+		// 対象は Java のファイルだけ（mapper の XML は、下の format 'xml' で別のルールで整形する）
+		target 'src/main/java/**/*.java', 'src/test/java/**/*.java'
+		// 使っていない import を消す
+		removeUnusedImports()
+		// import の並び順（Google スタイル：static をまとめて先に、空行 1 行、そのほかをまとめる）
+		importOrder('\\#', '')
+		// どこで動かしても同じ結果になるよう、Eclipse の版を固定する
+		eclipse('4.39').configFile('config/eclipse-java-google-style.xml')
+	}
+	// mapper の XML の整形（Prettier の XML 用プラグイン。SQL の空白と改行は手で書いたまま残す）
+	format 'xml', {
+		// 対象は mapper の XML だけ
+		target 'src/main/resources/mapper/*.xml'
+		// どこで動かしても同じ結果になるよう、版を固定する
+		prettier(['prettier': '3.9.9', '@prettier/plugin-xml': '3.4.2']).config([
+			'plugins': ['@prettier/plugin-xml'],
+			'parser': 'xml',
+			'tabWidth': 2,
+			'printWidth': 100,
+			// タグの中の文字（SQL）の空白と改行を変えない
+			'xmlWhitespaceSensitivity': 'preserve'
+		])
+	}
 }

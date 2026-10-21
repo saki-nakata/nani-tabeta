@@ -1,12 +1,12 @@
 package com.nanitabeta.backend.controller.converter;
 
+import com.nanitabeta.backend.data.Area;
+import com.nanitabeta.backend.data.Region;
+import com.nanitabeta.backend.domain.RegionDetail;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
-import com.nanitabeta.backend.data.Area;
-import com.nanitabeta.backend.data.Region;
-import com.nanitabeta.backend.domain.RegionDetail;
 
 /**
  * 地域とエリアを地域詳細に変換する Converter です。

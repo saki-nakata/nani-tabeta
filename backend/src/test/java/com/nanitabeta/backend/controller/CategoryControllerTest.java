@@ -1,14 +1,19 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
+import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
-import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.nanitabeta.backend.config.SecurityConfig;
+import com.nanitabeta.backend.config.UserAuthenticationConverter;
+import com.nanitabeta.backend.data.Category;
+import com.nanitabeta.backend.service.CategoryService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +22,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.nanitabeta.backend.config.SecurityConfig;
-import com.nanitabeta.backend.config.UserAuthenticationConverter;
-import com.nanitabeta.backend.data.Category;
-import com.nanitabeta.backend.service.CategoryService;
-
 
 @WebMvcTest(CategoryController.class)
 @Import(SecurityConfig.class)
