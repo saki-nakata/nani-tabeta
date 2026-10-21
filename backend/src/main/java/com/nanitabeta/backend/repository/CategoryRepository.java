@@ -1,8 +1,8 @@
 package com.nanitabeta.backend.repository;
 
+import com.nanitabeta.backend.data.Category;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
-import com.nanitabeta.backend.data.Category;
 
 /**
  * 分類マスタを扱うリポジトリです。

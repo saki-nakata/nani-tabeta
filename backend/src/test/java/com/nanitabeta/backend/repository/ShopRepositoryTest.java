@@ -2,6 +2,8 @@ package com.nanitabeta.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.nanitabeta.backend.data.Shop;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -9,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.context.jdbc.Sql;
-import com.nanitabeta.backend.data.Shop;
 
 @MybatisTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -96,8 +97,7 @@ class ShopRepositoryTest {
   void 店の候補_エリア内の閉店していない店を店名順で取得できること() {
     List<Shop> actual = sut.searchShopSuggestions(20L, null, null, 20);
 
-    assertThat(actual).extracting(Shop::getShopName)
-        .containsExactly("スターバックス", "セブンイレブン");
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("スターバックス", "セブンイレブン");
   }
 
   @Test
@@ -240,8 +240,7 @@ class ShopRepositoryTest {
   void 店の更新_同じ店名とエリアの店がすでにある場合は例外が発生すること() {
     Shop shop = new Shop(1L, "セブンイレブン", 20L, 9L, false);
 
-    assertThatThrownBy(() -> sut.updateShop(shop))
-        .isInstanceOf(DuplicateKeyException.class);
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(DuplicateKeyException.class);
   }
 
   @Test

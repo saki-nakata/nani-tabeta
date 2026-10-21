@@ -1,14 +1,22 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.nanitabeta.backend.config.SecurityConfig;
+import com.nanitabeta.backend.config.UserAuthenticationConverter;
+import com.nanitabeta.backend.data.Item;
+import com.nanitabeta.backend.exception.DuplicateItemNameException;
+import com.nanitabeta.backend.exception.InvalidCategoryException;
+import com.nanitabeta.backend.exception.ResourceNotFoundException;
+import com.nanitabeta.backend.service.ItemService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +25,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.nanitabeta.backend.config.SecurityConfig;
-import com.nanitabeta.backend.config.UserAuthenticationConverter;
-import com.nanitabeta.backend.data.Item;
-import com.nanitabeta.backend.exception.DuplicateItemNameException;
-import com.nanitabeta.backend.exception.InvalidCategoryException;
-import com.nanitabeta.backend.exception.ResourceNotFoundException;
-import com.nanitabeta.backend.service.ItemService;
 
 @WebMvcTest(ItemController.class)
 @Import(SecurityConfig.class)
@@ -67,8 +68,7 @@ class ItemControllerTest {
         .thenThrow(new ResourceNotFoundException("店が見つかりません。id=999"));
 
     mockMvc.perform(get("/api/shops/999/items").with(registeredUser()))
-        .andExpect(status().isNotFound())
-        .andExpect(content().json("""
+        .andExpect(status().isNotFound()).andExpect(content().json("""
             {"statusValue": 404, "statusName": "NOT_FOUND", "message": "店が見つかりません。id=999"}
             """));
   }
@@ -79,11 +79,13 @@ class ItemControllerTest {
     Item expected = new Item(1L, 1L, "からあげクン", 4L, true);
     when(service.updateItem(any())).thenReturn(expected);
 
-    mockMvc.perform(put("/api/items/1").with(registeredUser())
-        .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "からあげクン", "categoryId": 4, "isSeasonal": true}
-        """)).andExpect(status().isOk())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(content().json("""
+    mockMvc
+        .perform(put("/api/items/1").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"itemName": "からあげクン", "categoryId": 4, "isSeasonal": true}
+                """))
+        .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().json("""
             {"id": 1, "shopId": 1, "itemName": "からあげクン", "categoryId": 4, "isSeasonal": true}
             """));
 
@@ -92,13 +94,12 @@ class ItemControllerTest {
 
   @Test
   void 商品の更新_見つからない場合は404が返ること() throws Exception {
-    when(service.updateItem(any()))
-        .thenThrow(new ResourceNotFoundException("商品が見つかりません。id=999"));
+    when(service.updateItem(any())).thenThrow(new ResourceNotFoundException("商品が見つかりません。id=999"));
 
     mockMvc.perform(put("/api/items/999").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "からあげクン", "categoryId": 4, "isSeasonal": true}
-        """)).andExpect(status().isNotFound()).andExpect(content().json("""
+            {"itemName": "からあげクン", "categoryId": 4, "isSeasonal": true}
+            """)).andExpect(status().isNotFound()).andExpect(content().json("""
             {"statusValue": 404, "statusName": "NOT_FOUND", "message": "商品が見つかりません。id=999"}
             """));
   }
@@ -110,8 +111,8 @@ class ItemControllerTest {
 
     mockMvc.perform(put("/api/items/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "からあげクン", "categoryId": 999, "isSeasonal": true}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"itemName": "からあげクン", "categoryId": 999, "isSeasonal": true}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "指定された分類が存在しません。categoryId=999"}
             """));
@@ -119,13 +120,13 @@ class ItemControllerTest {
 
   @Test
   void 商品の更新_商品名が重複する場合は409が返ること() throws Exception {
-    when(service.updateItem(any())).thenThrow(
-        new DuplicateItemNameException("同じ商品名の商品が、その店にすでに登録されています。"));
+    when(service.updateItem(any()))
+        .thenThrow(new DuplicateItemNameException("同じ商品名の商品が、その店にすでに登録されています。"));
 
     mockMvc.perform(put("/api/items/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "おにぎり 鮭", "categoryId": 1, "isSeasonal": false}
-        """)).andExpect(status().isConflict()).andExpect(content().json("""
+            {"itemName": "おにぎり 鮭", "categoryId": 1, "isSeasonal": false}
+            """)).andExpect(status().isConflict()).andExpect(content().json("""
             {"statusValue": 409, "statusName": "CONFLICT",
              "message": "同じ商品名の商品が、その店にすでに登録されています。"}
             """));
@@ -135,8 +136,8 @@ class ItemControllerTest {
   void 商品の更新_商品名が空の場合は400が返ること() throws Exception {
     mockMvc.perform(put("/api/items/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "", "categoryId": 4, "isSeasonal": true}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"itemName": "", "categoryId": 4, "isSeasonal": true}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "商品名を入力してください。"}
             """));
 
@@ -147,8 +148,8 @@ class ItemControllerTest {
   void 商品の更新_分類が未指定の場合は400が返ること() throws Exception {
     mockMvc.perform(put("/api/items/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "からあげクン", "isSeasonal": true}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"itemName": "からあげクン", "isSeasonal": true}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "分類を選択してください。"}
             """));
 
@@ -159,8 +160,8 @@ class ItemControllerTest {
   void 商品の更新_季節限定かが未指定の場合は400が返ること() throws Exception {
     mockMvc.perform(put("/api/items/1").with(registeredUser())
         .contentType(MediaType.APPLICATION_JSON).content("""
-        {"itemName": "からあげクン", "categoryId": 4}
-        """)).andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"itemName": "からあげクン", "categoryId": 4}
+            """)).andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "季節限定かどうかを指定してください。"}
             """));

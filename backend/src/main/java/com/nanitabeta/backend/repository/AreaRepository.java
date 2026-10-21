@@ -1,9 +1,9 @@
 package com.nanitabeta.backend.repository;
 
-import java.util.List;
-import org.apache.ibatis.annotations.Mapper;
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * 地域マスタとエリアマスタを扱うリポジトリです。

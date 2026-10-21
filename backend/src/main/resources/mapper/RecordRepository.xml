@@ -2,7 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nanitabeta.backend.repository.RecordRepository">
-
   <!-- 記録の1件取得 -->
   <select id="searchRecord" resultType="com.nanitabeta.backend.data.FoodRecord">
     SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price
@@ -64,5 +63,4 @@
     DELETE FROM record_photos
     WHERE record_id = #{recordId}
   </delete>
-
 </mapper>

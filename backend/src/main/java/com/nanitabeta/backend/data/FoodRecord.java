@@ -1,7 +1,7 @@
 package com.nanitabeta.backend.data;
 
-import java.time.LocalDate;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

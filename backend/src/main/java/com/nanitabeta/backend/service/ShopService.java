@@ -1,10 +1,5 @@
 package com.nanitabeta.backend.service;
 
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.ShopRegistration;
 import com.nanitabeta.backend.exception.DuplicateShopNameException;
@@ -13,6 +8,11 @@ import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 import com.nanitabeta.backend.util.LikeEscaper;
 import com.nanitabeta.backend.util.NameNormalizer;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 店を扱うサービスです。

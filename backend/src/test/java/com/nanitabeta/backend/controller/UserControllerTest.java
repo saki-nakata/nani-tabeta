@@ -1,16 +1,22 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
+import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
+import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
-import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
-import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.nanitabeta.backend.config.SecurityConfig;
+import com.nanitabeta.backend.config.UserAuthenticationConverter;
+import com.nanitabeta.backend.data.User;
+import com.nanitabeta.backend.exception.DuplicateUserException;
+import com.nanitabeta.backend.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,11 +24,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.nanitabeta.backend.config.SecurityConfig;
-import com.nanitabeta.backend.config.UserAuthenticationConverter;
-import com.nanitabeta.backend.data.User;
-import com.nanitabeta.backend.exception.DuplicateUserException;
-import com.nanitabeta.backend.service.UserService;
 
 @WebMvcTest(UserController.class)
 @Import(SecurityConfig.class)
@@ -83,8 +84,9 @@ class UserControllerTest {
   void ユーザーの登録_ニックネームが30文字を超える場合は400が返ること() throws Exception {
     String nickname = "あ".repeat(31);
 
-    mockMvc.perform(post("/api/users").with(unregisteredUser())
-        .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\": \"" + nickname + "\"}"))
+    mockMvc
+        .perform(post("/api/users").with(unregisteredUser()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"nickname\": \"" + nickname + "\"}"))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "ニックネームは30文字以内で入力してください。"}
@@ -119,8 +121,8 @@ class UserControllerTest {
     User expected = new User(USER_ID, "Saki", null, null, "user");
     when(service.searchUser(USER_ID)).thenReturn(expected);
 
-    mockMvc.perform(get("/api/users/me").with(registeredUser()))
-        .andExpect(status().isOk()).andExpect(content().json("""
+    mockMvc.perform(get("/api/users/me").with(registeredUser())).andExpect(status().isOk())
+        .andExpect(content().json("""
             {"id": "20b622c8-dd31-46e8-8f1a-64009c7febe5", "nickname": "Saki", "role": "user"}
             """));
 

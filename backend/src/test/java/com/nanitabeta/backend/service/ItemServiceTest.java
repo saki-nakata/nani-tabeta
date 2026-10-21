@@ -11,6 +11,12 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.nanitabeta.backend.data.Item;
+import com.nanitabeta.backend.exception.DuplicateItemNameException;
+import com.nanitabeta.backend.exception.InvalidCategoryException;
+import com.nanitabeta.backend.exception.ResourceNotFoundException;
+import com.nanitabeta.backend.repository.ItemRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,11 +24,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
-import com.nanitabeta.backend.data.Item;
-import com.nanitabeta.backend.exception.DuplicateItemNameException;
-import com.nanitabeta.backend.exception.InvalidCategoryException;
-import com.nanitabeta.backend.exception.ResourceNotFoundException;
-import com.nanitabeta.backend.repository.ItemRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
@@ -69,8 +70,7 @@ class ItemServiceTest {
 
   @Test
   void 商品の候補_店が存在しない場合は例外を投げて検索しないこと() {
-    doThrow(new ResourceNotFoundException("店が見つかりません。id=999")).when(shopService)
-        .searchShop(999L);
+    doThrow(new ResourceNotFoundException("店が見つかりません。id=999")).when(shopService).searchShop(999L);
 
     assertThatThrownBy(() -> sut.searchItemSuggestions(999L, null))
         .isInstanceOf(ResourceNotFoundException.class).hasMessage("店が見つかりません。id=999");
@@ -208,8 +208,8 @@ class ItemServiceTest {
     Item item = new Item(1L, null, "からあげ棒", 999L, false);
     Item expected = new Item(1L, 1L, "からあげ棒", 4L, false);
     when(repository.searchItem(1L)).thenReturn(expected);
-    doThrow(new InvalidCategoryException("指定された分類が存在しません。categoryId=999"))
-        .when(categoryService).searchCategory(999L);
+    doThrow(new InvalidCategoryException("指定された分類が存在しません。categoryId=999")).when(categoryService)
+        .searchCategory(999L);
 
     assertThatThrownBy(() -> sut.updateItem(item)).isInstanceOf(InvalidCategoryException.class)
         .hasMessage("指定された分類が存在しません。categoryId=999");
@@ -225,8 +225,7 @@ class ItemServiceTest {
     doThrow(new DuplicateKeyException("重複")).when(repository).updateItem(any());
 
     assertThatThrownBy(() -> sut.updateItem(item)).isInstanceOf(DuplicateItemNameException.class)
-        .hasMessage("同じ商品名の商品が、その店にすでに登録されています。")
-        .hasCauseInstanceOf(DuplicateKeyException.class);
+        .hasMessage("同じ商品名の商品が、その店にすでに登録されています。").hasCauseInstanceOf(DuplicateKeyException.class);
   }
 
   @Test

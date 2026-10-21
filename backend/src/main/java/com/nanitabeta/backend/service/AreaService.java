@@ -1,14 +1,14 @@
 package com.nanitabeta.backend.service;
 
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import com.nanitabeta.backend.controller.converter.AreaConverter;
 import com.nanitabeta.backend.data.Area;
 import com.nanitabeta.backend.data.Region;
 import com.nanitabeta.backend.domain.RegionDetail;
 import com.nanitabeta.backend.exception.InvalidAreaException;
 import com.nanitabeta.backend.repository.AreaRepository;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 /**
  * 地域マスタとエリアマスタを扱うサービスです。

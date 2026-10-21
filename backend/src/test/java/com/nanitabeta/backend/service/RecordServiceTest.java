@@ -9,14 +9,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import java.time.LocalDate;
-import java.util.List;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.InOrder;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+
 import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
 import com.nanitabeta.backend.data.Shop;
@@ -27,6 +20,14 @@ import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
+import java.time.LocalDate;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class RecordServiceTest {
@@ -97,8 +98,7 @@ class RecordServiceTest {
     when(repository.searchRecord(1L)).thenReturn(registered);
     when(repository.searchRecordPhotoPaths(1L)).thenReturn(List.of(PHOTO_1, PHOTO_2));
     // insertRecord に渡した記録（ID は INSERT で書き戻された値）
-    FoodRecord expectedArgument =
-        new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
+    FoodRecord expectedArgument = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
     RecordDetail expected =
         new RecordDetail(registered, linkedItem, shop, List.of(PHOTO_1, PHOTO_2));
 
@@ -160,8 +160,8 @@ class RecordServiceTest {
   void 記録の登録_分類が存在しない場合は例外を投げて何も登録しないこと() {
     FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
     Item item = new Item(null, 2L, "からあげ棒", 999L, false);
-    doThrow(new InvalidCategoryException("指定された分類が存在しません。categoryId=999"))
-        .when(categoryService).searchCategory(999L);
+    doThrow(new InvalidCategoryException("指定された分類が存在しません。categoryId=999")).when(categoryService)
+        .searchCategory(999L);
 
     assertThatThrownBy(() -> sut.registerRecord(input, item, List.of(PHOTO_1)))
         .isInstanceOf(InvalidCategoryException.class);

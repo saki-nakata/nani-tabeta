@@ -4,6 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+
+import com.nanitabeta.backend.data.FoodRecord;
+import com.nanitabeta.backend.data.Item;
+import com.nanitabeta.backend.domain.RecordDetail;
+import com.nanitabeta.backend.repository.ItemRepository;
+import com.nanitabeta.backend.repository.RecordRepository;
+import com.nanitabeta.backend.repository.ShopRepository;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -16,12 +23,6 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import com.nanitabeta.backend.data.FoodRecord;
-import com.nanitabeta.backend.data.Item;
-import com.nanitabeta.backend.domain.RecordDetail;
-import com.nanitabeta.backend.repository.ItemRepository;
-import com.nanitabeta.backend.repository.RecordRepository;
-import com.nanitabeta.backend.repository.ShopRepository;
 
 /**
  * 本物の DB とトランザクションを使って、記録の登録を確かめるテストです。

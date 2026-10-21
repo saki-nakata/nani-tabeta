@@ -1,7 +1,7 @@
 package com.nanitabeta.backend.domain;
 
-import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

@@ -1,9 +1,9 @@
 package com.nanitabeta.backend.repository;
 
+import com.nanitabeta.backend.data.Item;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import com.nanitabeta.backend.data.Item;
 
 /**
  * 商品を扱うリポジトリです。
@@ -25,8 +25,7 @@ public interface ItemRepository {
    * キーワードを指定した場合は、商品名に含まれる商品だけを返します。 キーワードの比較は濁点と大文字小文字を区別しません（取りこぼしを避けるため）。
    * <p>
    * 商品名がキーワードと完全に一致する商品（比較は商品名の列の照合順序に従う）は、件数の上限に関係なく先頭に並べます。 残りは商品名順です。
-   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる商品が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。
-   * その場合も、完全一致する商品は候補に含めます。
+   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる商品が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。 その場合も、完全一致する商品は候補に含めます。
    *
    * @param shopId 店ID
    * @param likeKeyword 商品名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
@@ -79,8 +78,8 @@ public interface ItemRepository {
    * <p>
    * 記録の付け替え・削除で使われなくなった商品を消すために使います。 記録が残っている場合は何もしません。
    * <p>
-   * 商品を参照するテーブル（今は records だけ）が増えた場合は、そのテーブルも条件に加えること。
-   * 加えないと、外部キー違反で削除に失敗する（ON DELETE CASCADE なら参照している行が黙って消える）。
+   * 商品を参照するテーブル（今は records だけ）が増えた場合は、そのテーブルも条件に加えること。 加えないと、外部キー違反で削除に失敗する（ON DELETE CASCADE
+   * なら参照している行が黙って消える）。
    *
    * @param id 商品ID
    */

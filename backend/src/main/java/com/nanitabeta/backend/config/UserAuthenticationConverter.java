@@ -1,5 +1,7 @@
 package com.nanitabeta.backend.config;
 
+import com.nanitabeta.backend.data.User;
+import com.nanitabeta.backend.repository.UserRepository;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,8 +11,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
-import com.nanitabeta.backend.data.User;
-import com.nanitabeta.backend.repository.UserRepository;
 
 /**
  * 検証済みの JWT から、ログイン中の利用者の権限を決めます。
