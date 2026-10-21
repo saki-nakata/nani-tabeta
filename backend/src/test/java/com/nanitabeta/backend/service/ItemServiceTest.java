@@ -60,7 +60,7 @@ class ItemServiceTest {
   @Test
   void 商品の候補_リポジトリの結果をそのまま返すこと() {
     List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
-    when(repository.searchItemSuggestions(any(), any(), anyInt())).thenReturn(expected);
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
     List<Item> actual = sut.searchItemSuggestions(1L, "から");
 
@@ -75,35 +75,51 @@ class ItemServiceTest {
     assertThatThrownBy(() -> sut.searchItemSuggestions(999L, null))
         .isInstanceOf(ResourceNotFoundException.class).hasMessage("店が見つかりません。id=999");
 
-    verify(repository, never()).searchItemSuggestions(any(), any(), anyInt());
+    verify(repository, never()).searchItemSuggestions(any(), any(), any(), anyInt());
   }
 
   @Test
   void 商品の候補_キーワードを正規化してから渡すこと() {
     sut.searchItemSuggestions(1L, "　から　あげ　"); // 前後と途中に全角スペース
 
-    verify(repository).searchItemSuggestions(eq(1L), eq("から あげ"), anyInt());
+    verify(repository).searchItemSuggestions(eq(1L), eq("から あげ"), eq("から あげ"), anyInt());
   }
 
   @Test
-  void 商品の候補_キーワードのワイルドカードをエスケープすること() {
-    sut.searchItemSuggestions(1L, "100%_OFF");
+  void 商品の候補_部分一致用はワイルドカードとバックスラッシュをエスケープし完全一致用はエスケープしないこと() {
+    sut.searchItemSuggestions(1L, "　100%_\\OFF　");
 
-    verify(repository).searchItemSuggestions(eq(1L), eq("100\\%\\_OFF"), anyInt());
+    // 部分一致用（LIKE）：100\%\_\\OFF、完全一致用：100%_\OFF（正規化だけ）
+    verify(repository).searchItemSuggestions(eq(1L), eq("100\\%\\_\\\\OFF"), eq("100%_\\OFF"),
+        anyInt());
   }
 
   @Test
   void 商品の候補_件数の上限を10件として渡すこと() {
     sut.searchItemSuggestions(1L, "から");
 
-    verify(repository).searchItemSuggestions(eq(1L), eq("から"), eq(10));
+    verify(repository).searchItemSuggestions(eq(1L), eq("から"), eq("から"), eq(10));
   }
 
   @Test
-  void 商品の候補_キーワードが未指定の場合はnullのまま渡すこと() {
+  void 商品の候補_キーワードが未指定の場合は部分一致用も完全一致用もnullのまま渡すこと() {
     sut.searchItemSuggestions(1L, null);
 
-    verify(repository).searchItemSuggestions(eq(1L), isNull(), anyInt());
+    verify(repository).searchItemSuggestions(eq(1L), isNull(), isNull(), anyInt());
+  }
+
+  @Test
+  void 商品の候補_キーワードが空文字の場合は部分一致用も完全一致用も空文字で渡すこと() {
+    sut.searchItemSuggestions(1L, "");
+
+    verify(repository).searchItemSuggestions(eq(1L), eq(""), eq(""), anyInt());
+  }
+
+  @Test
+  void 商品の候補_キーワードが空白だけの場合は正規化して空文字で渡すこと() {
+    sut.searchItemSuggestions(1L, " 　 ");
+
+    verify(repository).searchItemSuggestions(eq(1L), eq(""), eq(""), anyInt());
   }
 
   @Test

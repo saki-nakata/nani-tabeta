@@ -10,16 +10,25 @@
     WHERE id = #{id}
   </select>
 
-  <!-- 店の商品の候補（キーワードは濁点・大文字小文字を区別せずに部分一致） -->
+  <!-- 店の商品の候補（キーワードは濁点・大文字小文字を区別せずに部分一致、または商品名が完全に一致。完全に同じ商品名を先頭に並べる） -->
   <select id="searchItemSuggestions" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal
     FROM items
     WHERE shop_id = #{shopId}
       AND EXISTS (SELECT 1 FROM records WHERE records.item_id = items.id)
-    <if test="keyword != null and keyword != ''">
-      AND item_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{keyword}, '%')
+    <if test="likeKeyword != null and likeKeyword != ''">
+      AND (
+        item_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{likeKeyword}, '%')
+        <if test="sameKeyword != null and sameKeyword != ''">
+          OR item_name = #{sameKeyword}
+        </if>
+      )
     </if>
-    ORDER BY item_name
+    ORDER BY
+    <if test="sameKeyword != null and sameKeyword != ''">
+      item_name = #{sameKeyword} DESC,
+    </if>
+      item_name
     LIMIT #{limit}
   </select>
 

@@ -39,7 +39,7 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_店の商品を商品名順に取得できること() {
-    List<Item> actual = sut.searchItemSuggestions(1L, null, 10);
+    List<Item> actual = sut.searchItemSuggestions(1L, null, null, 10);
 
     assertThat(actual).extracting(Item::getItemName).containsExactly("おにぎり 鮭", "からあげ棒");
   }
@@ -47,7 +47,7 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_商品が登録されていない店の場合は空のリストを返すこと() {
-    List<Item> actual = sut.searchItemSuggestions(3L, null, 10);
+    List<Item> actual = sut.searchItemSuggestions(3L, null, null, 10);
 
     assertThat(actual).isEmpty();
   }
@@ -55,7 +55,7 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_キーワードで部分一致の絞り込みができること() {
-    List<Item> actual = sut.searchItemSuggestions(1L, "から", 10);
+    List<Item> actual = sut.searchItemSuggestions(1L, "から", "から", 10);
 
     assertThat(actual).extracting(Item::getId).containsExactly(1L);
   }
@@ -63,7 +63,7 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_キーワードは濁点と大文字小文字を区別しないこと() {
-    List<Item> actual = sut.searchItemSuggestions(1L, "からあけ棒", 10);
+    List<Item> actual = sut.searchItemSuggestions(1L, "からあけ棒", "からあけ棒", 10);
 
     assertThat(actual).extracting(Item::getId).containsExactly(1L);
   }
@@ -71,7 +71,7 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_該当がない場合は空のリストを返すこと() {
-    List<Item> actual = sut.searchItemSuggestions(1L, "ラーメン", 10);
+    List<Item> actual = sut.searchItemSuggestions(1L, "ラーメン", "ラーメン", 10);
 
     assertThat(actual).isEmpty();
   }
@@ -79,9 +79,78 @@ class ItemRepositoryTest {
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_件数の上限を超えないこと() {
-    List<Item> actual = sut.searchItemSuggestions(1L, null, 1);
+    List<Item> actual = sut.searchItemSuggestions(1L, null, null, 1);
 
     assertThat(actual).hasSize(1);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_完全一致を指定しない場合は名前順の上限までで完全一致の商品が漏れること() {
+    // テストデータが、直す前の不具合（名前順では完全一致が 11 件目以降）を再現できていることの確認
+    List<Item> actual = sut.searchItemSuggestions(1L, "Latte", null, 10);
+
+    assertThat(actual).extracting(Item::getItemName).hasSize(10).doesNotContain("Latte");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_完全に同じ商品名は名前順で上限から漏れる場合でも先頭に返すこと() {
+    List<Item> actual = sut.searchItemSuggestions(1L, "Latte", "Latte", 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("Latte", "A01 Latte",
+        "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte",
+        "A09 Latte");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_大文字小文字が違う商品は完全一致にならず完全一致の後ろに名前順で残ること() {
+    List<Item> actual = sut.searchItemSuggestions(1L, "Latte", "Latte", 20);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("Latte", "A01 Latte",
+        "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte",
+        "A09 Latte", "A10 Latte", "latte");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_ワイルドカードとバックスラッシュを含む商品名でも完全一致を先頭に返すこと() {
+    // 部分一致用はエスケープ済み（100\%\_\\OFF）、完全一致用はエスケープ前（100%_\OFF）
+    List<Item> actual = sut.searchItemSuggestions(2L, "100\\%\\_\\\\OFF", "100%_\\OFF", 10);
+
+    assertThat(actual).hasSize(10);
+    assertThat(actual.get(0).getItemName()).isEqualTo("100%_\\OFF");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_ひらがなとカタカナだけが違う商品名は完全一致として先頭に返すこと() {
+    // 商品名の列の照合順序（utf8mb4_ja_0900_as_cs）では「らて」と「ラテ」は同じ
+    List<Item> actual = sut.searchItemSuggestions(3L, "らて", "らて", 10);
+
+    assertThat(actual).hasSize(10);
+    assertThat(actual.get(0).getItemName()).isEqualTo("ラテ");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_部分一致では見つからないが完全一致になる商品も候補に含めること() {
+    // 「カ」＋結合濁点（2文字）は、= では「ガ」（1文字）と一致するが、LIKE は1文字ずつ比べるので一致しない
+    String keyword = "ガ";
+
+    List<Item> actual = sut.searchItemSuggestions(5L, keyword, keyword, 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("ガ");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-exact-match.sql")
+  void 商品の候補_濁点が違う商品は候補に残るが完全一致の後ろになること() {
+    // 名前順では「からあけ」が先だが、完全一致の「からあげ」を先頭に並べる
+    List<Item> actual = sut.searchItemSuggestions(4L, "からあげ", "からあげ", 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("からあげ", "からあけ");
   }
 
   @Test
@@ -176,7 +245,7 @@ class ItemRepositoryTest {
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_記録がない商品は候補に出ないこと() {
     // 店1の「からあげ串」（id=4）は記録が0件
-    List<Item> actual = sut.searchItemSuggestions(1L, "から", 10);
+    List<Item> actual = sut.searchItemSuggestions(1L, "から", "から", 10);
 
     assertThat(actual).extracting(Item::getId).containsExactly(1L);
   }

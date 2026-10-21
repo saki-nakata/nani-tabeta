@@ -23,13 +23,19 @@ public interface ItemRepository {
    * 指定した店の商品を、入力補助の候補として取得します。
    * <p>
    * キーワードを指定した場合は、商品名に含まれる商品だけを返します。 キーワードの比較は濁点と大文字小文字を区別しません（取りこぼしを避けるため）。
+   * <p>
+   * 商品名がキーワードと完全に一致する商品（比較は商品名の列の照合順序に従う）は、件数の上限に関係なく先頭に並べます。 残りは商品名順です。
+   * 部分一致（LIKE）は1文字ずつ比べるため、完全一致になる商品が部分一致では見つからないことがあります（濁点を組み合わせた文字など）。
+   * その場合も、完全一致する商品は候補に含めます。
    *
    * @param shopId 店ID
-   * @param keyword 商品名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
+   * @param likeKeyword 商品名の一部（null または空文字の場合は絞り込まない。LIKE のエスケープ済み）
+   * @param sameKeyword 先頭に並べる商品名（正規化済み・エスケープ前。null または空文字の場合は先頭に並べない）
    * @param limit 取得する最大件数
    * @return 商品の一覧（該当がない場合は空のリスト）
    */
-  List<Item> searchItemSuggestions(@Param("shopId") Long shopId, @Param("keyword") String keyword,
+  List<Item> searchItemSuggestions(@Param("shopId") Long shopId,
+      @Param("likeKeyword") String likeKeyword, @Param("sameKeyword") String sameKeyword,
       @Param("limit") int limit);
 
   /**

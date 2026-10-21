@@ -181,7 +181,7 @@ class ShopServiceTest {
   @Test
   void 店の候補_リポジトリの結果をそのまま返すこと() {
     List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
-    when(repository.searchShopSuggestions(any(), any(), anyInt())).thenReturn(expected);
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
     List<Shop> actual = sut.searchShopSuggestions(20L, "スター");
 
@@ -192,28 +192,45 @@ class ShopServiceTest {
   void 店の候補_キーワードを正規化してから渡すこと() {
     sut.searchShopSuggestions(20L, "　スター　バックス　"); // 前後と途中に全角スペース
 
-    verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), anyInt());
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), eq("スター バックス"),
+        anyInt());
   }
 
   @Test
-  void 店の候補_キーワードのワイルドカードをエスケープすること() {
-    sut.searchShopSuggestions(20L, "100%_OFF");
+  void 店の候補_部分一致用はワイルドカードとバックスラッシュをエスケープし完全一致用はエスケープしないこと() {
+    sut.searchShopSuggestions(20L, "　100%_\\OFF　");
 
-    verify(repository).searchShopSuggestions(eq(20L), eq("100\\%\\_OFF"), anyInt());
+    // 部分一致用（LIKE）：100\%\_\\OFF、完全一致用：100%_\OFF（正規化だけ）
+    verify(repository).searchShopSuggestions(eq(20L), eq("100\\%\\_\\\\OFF"), eq("100%_\\OFF"),
+        anyInt());
   }
 
   @Test
   void 店の候補_件数の上限を10件として渡すこと() {
     sut.searchShopSuggestions(20L, "スター");
 
-    verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq(10));
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq("スター"), eq(10));
   }
 
   @Test
-  void 店の候補_キーワードが未指定の場合はnullのまま渡すこと() {
+  void 店の候補_キーワードが未指定の場合は部分一致用も完全一致用もnullのまま渡すこと() {
     sut.searchShopSuggestions(20L, null);
 
-    verify(repository).searchShopSuggestions(eq(20L), isNull(), anyInt());
+    verify(repository).searchShopSuggestions(eq(20L), isNull(), isNull(), anyInt());
+  }
+
+  @Test
+  void 店の候補_キーワードが空文字の場合は部分一致用も完全一致用も空文字で渡すこと() {
+    sut.searchShopSuggestions(20L, "");
+
+    verify(repository).searchShopSuggestions(eq(20L), eq(""), eq(""), anyInt());
+  }
+
+  @Test
+  void 店の候補_キーワードが空白だけの場合は正規化して空文字で渡すこと() {
+    sut.searchShopSuggestions(20L, " 　 ");
+
+    verify(repository).searchShopSuggestions(eq(20L), eq(""), eq(""), anyInt());
   }
 
   @Test
@@ -279,6 +296,6 @@ class ShopServiceTest {
         .isInstanceOf(InvalidAreaException.class)
         .hasMessage("指定されたエリアが存在しません。areaId=999");
 
-    verify(repository, never()).searchShopSuggestions(any(), any(), anyInt());
+    verify(repository, never()).searchShopSuggestions(any(), any(), any(), anyInt());
   }
 }
