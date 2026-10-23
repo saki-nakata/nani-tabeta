@@ -93,6 +93,62 @@ class ShopRepositoryTest {
   }
 
   @Test
+  void 大文字小文字だけが違う店名は同じエリアでも別の店として登録できること() {
+    // 店名はまとめない（同じ都道府県に、書き方だけが違う別の店がありうるため）
+    Shop upper = new Shop(null, "CAFE", 27L, 9L, null);
+    Shop lower = new Shop(null, "cafe", 27L, 9L, null);
+
+    sut.insertShop(upper);
+    sut.insertShop(lower);
+
+    assertThat(lower.getId()).isNotEqualTo(upper.getId());
+    assertThat(sut.searchShopByNameAndArea(new Shop(null, "cafe", 27L, null, null)).getId())
+        .isEqualTo(lower.getId());
+    assertThat(sut.searchShopByNameAndAreaForShare(new Shop(null, "CAFE", 27L, null, null)).getId())
+        .isEqualTo(upper.getId());
+  }
+
+  @Test
+  void ひらがなとカタカナだけが違う店名は同じエリアでも別の店として登録できること() {
+    // 店名の列の照合順序（utf8mb4_ja_0900_as_cs_ks。V5）は、ひらがなとカタカナを区別する
+    Shop hiragana = new Shop(null, "さくら", 27L, 9L, null);
+    Shop katakana = new Shop(null, "サクラ", 27L, 9L, null);
+
+    sut.insertShop(hiragana);
+    sut.insertShop(katakana);
+
+    assertThat(katakana.getId()).isNotEqualTo(hiragana.getId());
+    assertThat(sut.searchShopByNameAndArea(new Shop(null, "さくら", 27L, null, null)).getId())
+        .isEqualTo(hiragana.getId());
+    assertThat(sut.searchShopByNameAndAreaForShare(new Shop(null, "サクラ", 27L, null, null)).getId())
+        .isEqualTo(katakana.getId());
+  }
+
+  @Test
+  void 店の更新_ほかの店とひらがなとカタカナだけが違う店名には変更できること() {
+    Shop sakura = new Shop(null, "さくら", 27L, 9L, null);
+    Shop momo = new Shop(null, "もも", 27L, 9L, null);
+    sut.insertShop(sakura);
+    sut.insertShop(momo);
+
+    sut.updateShop(new Shop(momo.getId(), "サクラ", 27L, 9L, false));
+
+    assertThat(sut.searchShop(momo.getId()).getShopName()).isEqualTo("サクラ");
+  }
+
+  @Test
+  void 店の更新_ほかの店と同じ表記の店名に変える場合は例外が発生すること() {
+    Shop sakura = new Shop(null, "さくら", 27L, 9L, null);
+    Shop momo = new Shop(null, "もも", 27L, 9L, null);
+    sut.insertShop(sakura);
+    sut.insertShop(momo);
+
+    Shop shop = new Shop(momo.getId(), "さくら", 27L, 9L, false);
+
+    assertThatThrownBy(() -> sut.updateShop(shop)).isInstanceOf(DuplicateKeyException.class);
+  }
+
+  @Test
   @Sql("/sql/insert-shops-for-suggestions.sql")
   void 店の候補_エリア内の閉店していない店を店名順で取得できること() {
     List<Shop> actual = sut.searchShopSuggestions(20L, null, null, 20);
@@ -144,21 +200,63 @@ class ShopRepositoryTest {
   @Test
   @Sql("/sql/insert-shops-for-exact-match.sql")
   void 店の候補_完全に同じ店名は名前順で上限から漏れる場合でも先頭に返すこと() {
+    // 2 番目の「latte」は、大文字小文字だけが違う店（かな・大文字小文字の違いを吸収した一致）
     List<Shop> actual = sut.searchShopSuggestions(20L, "Latte", "Latte", 10);
 
-    assertThat(actual).extracting(Shop::getShopName).containsExactly("Latte", "A01 Latte",
-        "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte",
-        "A09 Latte");
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("Latte", "latte", "A01 Latte",
+        "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte");
   }
 
   @Test
   @Sql("/sql/insert-shops-for-exact-match.sql")
-  void 店の候補_大文字小文字が違う店は完全一致にならず完全一致の後ろに名前順で残ること() {
+  void 店の候補_大文字小文字が違う店は完全一致にならず完全一致の次に並ぶこと() {
+    // 店名はまとめないので「latte」は別の店。完全一致の「Latte」の次、そのほかの部分一致より前に並ぶ
     List<Shop> actual = sut.searchShopSuggestions(20L, "Latte", "Latte", 20);
 
-    assertThat(actual).extracting(Shop::getShopName).containsExactly("Latte", "A01 Latte",
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("Latte", "latte", "A01 Latte",
         "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte",
-        "A09 Latte", "A10 Latte", "latte");
+        "A09 Latte", "A10 Latte");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-exact-match.sql")
+  void 店の候補_完全一致_書き方の違いを吸収した一致_そのほかの部分一致の順に並び同じ順位の中は名前順になること() {
+    List<Shop> actual = sut.searchShopSuggestions(27L, "cafe", "cafe", 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("cafe", "Cafe", "CAFE",
+        "A cafe", "cafe ミナミ");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-exact-match.sql")
+  void 店の候補_大文字小文字だけが違う店は名前順で上限から漏れる場合でも優先して返すこと() {
+    // 完全一致はなく、名前順では「latte」「Latte」は 11・12 件目。かな・大文字小文字の違いを吸収した一致として先頭に並べる
+    List<Shop> actual = sut.searchShopSuggestions(20L, "LATTE", "LATTE", 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("latte", "Latte", "A01 Latte",
+        "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-exact-match.sql")
+  void 店の候補_書き方の違いを吸収した一致で集めるときもエリアと閉店の条件を守ること() {
+    // エリア28の「CAFE」は閉店。かな・大文字小文字の違いを吸収した一致の条件が、エリア・閉店の条件の外側にかかると、
+    // 閉店した「CAFE」や、ほかのエリア（27）の「cafe」などまで出てしまう
+    List<Shop> actual = sut.searchShopSuggestions(28L, "cafe", "cafe", 10);
+
+    assertThat(actual).isEmpty();
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-exact-match.sql")
+  void 店の候補_部分一致でも完全一致でも見つからないがかなと大文字小文字の違いを吸収すると一致する店も候補に含めること() {
+    // ひらがなの「か」＋結合濁点＋「cafe」は、LIKE（1文字ずつ比べる）でも = （かなと大文字小文字を区別する）でも
+    // 「ガCAFE」と一致しない。かなを同じとみなす照合順序で LOWER() どうしを比べると一致する
+    String keyword = "がcafe";
+
+    List<Shop> actual = sut.searchShopSuggestions(29L, keyword, keyword, 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("ガCAFE");
   }
 
   @Test
@@ -173,12 +271,23 @@ class ShopRepositoryTest {
 
   @Test
   @Sql("/sql/insert-shops-for-exact-match.sql")
-  void 店の候補_ひらがなとカタカナだけが違う店名は完全一致として先頭に返すこと() {
-    // 店名の列の照合順序（utf8mb4_ja_0900_as_cs）では「らて」と「ラテ」は同じ
+  void 店の候補_ひらがなとカタカナだけが違う店は完全一致にならず完全一致の次に並ぶこと() {
+    // 店名はかなを区別するので「ラテ」は別の店（V5）。名前順では 12 件目だが、
+    // かな・大文字小文字の違いを吸収した一致として、完全一致の「らて」の次に並べる
     List<Shop> actual = sut.searchShopSuggestions(22L, "らて", "らて", 10);
 
-    assertThat(actual).hasSize(10);
-    assertThat(actual.get(0).getShopName()).isEqualTo("ラテ");
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("らて", "ラテ", "A01 ラテ", "A02 ラテ",
+        "A03 ラテ", "A04 ラテ", "A05 ラテ", "A06 ラテ", "A07 ラテ", "A08 ラテ");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-exact-match.sql")
+  void 店の候補_かなと大文字小文字が混ざって違う店も完全一致の次の順位で名前順に並ぶこと() {
+    // 完全一致の「さくらcafe」はない。かな・大文字小文字の違いを吸収すると 3 つとも一致する
+    List<Shop> actual = sut.searchShopSuggestions(30L, "さくらcafe", "さくらcafe", 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("サクラcafe", "さくらCAFE",
+        "サクラCAFE", "A さくらcafe");
   }
 
   @Test

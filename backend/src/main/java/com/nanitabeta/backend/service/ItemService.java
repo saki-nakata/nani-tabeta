@@ -59,7 +59,7 @@ public class ItemService {
   public List<Item> searchItemSuggestions(Long shopId, String keyword) {
     shopService.searchShop(shopId); // 存在しない場合は ResourceNotFoundException
 
-    String sameKeyword = null; // 完全一致用
+    String sameKeyword = null; // LOWER 一致用（先頭に並べる）
     String likeKeyword = null; // 部分一致用
     if (keyword != null) {
       sameKeyword = NameNormalizer.normalize(keyword);
@@ -72,6 +72,7 @@ public class ItemService {
    * 商品を登録します。
    * <p>
    * 商品名を正規化したうえで、同じ店に同じ商品名の商品がすでにあれば、新しく作らずにその商品を返します。 同時に同じ商品が登録された場合も、あとから登録したほうは既存の商品を返します。
+   * 大文字小文字だけが違う商品名（Latte と latte）も同じ商品名とみなします。 既存の商品を返すときは、保存済みの商品名・分類・季節限定をそのまま返し、引数の値で上書きしません。
    * <p>
    * 記録の登録処理から、同じトランザクションの内側で呼び出されます。
    *

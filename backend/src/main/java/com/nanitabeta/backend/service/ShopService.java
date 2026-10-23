@@ -134,7 +134,7 @@ public class ShopService {
    */
   public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
     areaService.searchArea(areaId); // 存在しない場合は InvalidAreaException
-    String sameKeyword = null; // 完全一致用
+    String sameKeyword = null; // 完全一致・かなと大文字小文字の違いを吸収した一致用（先頭に並べる）
     String likeKeyword = null; // 部分一致用
     if (keyword != null) {
       sameKeyword = NameNormalizer.normalize(keyword);
