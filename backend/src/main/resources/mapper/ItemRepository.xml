@@ -9,7 +9,7 @@
     WHERE id = #{id}
   </select>
 
-  <!-- 店の商品の候補（キーワードは濁点・大文字小文字を区別せずに部分一致、または商品名が完全に一致。完全に同じ商品名を先頭に並べる） -->
+  <!-- 店の商品の候補（キーワードは濁点・大文字小文字を区別せずに部分一致、または商品名が LOWER 一致。LOWER 一致の商品名を先頭に並べる） -->
   <select id="searchItemSuggestions" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal
     FROM items
@@ -19,30 +19,30 @@
       AND (
         item_name COLLATE utf8mb4_0900_ai_ci LIKE CONCAT('%', #{likeKeyword}, '%')
         <if test="sameKeyword != null and sameKeyword != ''">
-          OR item_name = #{sameKeyword}
+          OR LOWER(item_name) = LOWER(#{sameKeyword})
         </if>
       )
     </if>
     ORDER BY
     <if test="sameKeyword != null and sameKeyword != ''">
-      item_name = #{sameKeyword} DESC,
+      LOWER(item_name) = LOWER(#{sameKeyword}) DESC,
     </if>
       item_name
     LIMIT #{limit}
   </select>
 
-  <!-- 店と商品名で商品を取得 -->
+  <!-- 店と商品名で商品を取得（商品名は LOWER 一致。大文字小文字だけが違う商品も同じ商品とする） -->
   <select id="searchItemByShopAndName" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal
     FROM items
-    WHERE shop_id = #{shopId} AND item_name = #{itemName}
+    WHERE shop_id = #{shopId} AND LOWER(item_name) = LOWER(#{itemName})
   </select>
 
-  <!-- 店と商品名で商品を取得（行ロックを取り、最新の確定データを読む） -->
+  <!-- 店と商品名で商品を取得（商品名は LOWER 一致。行ロックを取り、最新の確定データを読む） -->
   <select id="searchItemByShopAndNameForShare" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal
     FROM items
-    WHERE shop_id = #{shopId} AND item_name = #{itemName}
+    WHERE shop_id = #{shopId} AND LOWER(item_name) = LOWER(#{itemName})
     FOR SHARE
   </select>
 

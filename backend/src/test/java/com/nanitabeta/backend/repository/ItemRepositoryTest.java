@@ -106,12 +106,13 @@ class ItemRepositoryTest {
 
   @Test
   @Sql("/sql/insert-items-for-exact-match.sql")
-  void 商品の候補_大文字小文字が違う商品は完全一致にならず完全一致の後ろに名前順で残ること() {
-    List<Item> actual = sut.searchItemSuggestions(1L, "Latte", "Latte", 20);
+  void 商品の候補_大文字小文字だけが違う商品名もLOWER一致として先頭に返すこと() {
+    // 名前順では「Latte」は 11 件目。LOWER(商品名) どうしで一致する商品を先頭に並べる
+    List<Item> actual = sut.searchItemSuggestions(1L, "latte", "latte", 10);
 
     assertThat(actual).extracting(Item::getItemName).containsExactly("Latte", "A01 Latte",
         "A02 Latte", "A03 Latte", "A04 Latte", "A05 Latte", "A06 Latte", "A07 Latte", "A08 Latte",
-        "A09 Latte", "A10 Latte", "latte");
+        "A09 Latte");
   }
 
   @Test
@@ -195,6 +196,88 @@ class ItemRepositoryTest {
   }
 
   @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 大文字小文字だけが違う商品名は同じ商品として取得されること() {
+    Item item = new Item(null, 1L, "LATTE", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual.getId()).isEqualTo(1L);
+    assertThat(actual.getItemName()).isEqualTo("Latte"); // 保存されている表記のまま
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 大文字小文字だけが違う商品名はロックして取得するときも同じ商品として取得されること() {
+    Item item = new Item(null, 1L, "latte", null, null);
+
+    Item actual = sut.searchItemByShopAndNameForShare(item);
+
+    assertThat(actual.getId()).isEqualTo(1L);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 大文字小文字が同じでも店が異なれば別の商品として扱うこと() {
+    Item item = new Item(null, 2L, "latte", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual).isNull();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 小さいかなと大きいかなが違う商品名は別の商品として扱うこと() {
+    Item item = new Item(null, 1L, "きやべつ", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual).isNull();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 半角カナと全角カナが違う商品名は別の商品として扱うこと() {
+    Item item = new Item(null, 1L, "ﾗｰﾒﾝ", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual).isNull();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 丸数字と数字が違う商品名は別の商品として扱うこと() {
+    Item item = new Item(null, 1L, "①番", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual).isNull();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void アクセントの有無が違う商品名は別の商品として扱うこと() {
+    Item item = new Item(null, 1L, "Cafe", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual).isNull();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void アクセント付きの英字の大文字小文字もMySQLのLOWERに従って同じ商品として扱うこと() {
+    // 英字（ASCII）だけでなく、MySQL の LOWER() が小文字にする文字はすべて同じとみなす
+    Item item = new Item(null, 1L, "CAFÉ", null, null);
+
+    Item actual = sut.searchItemByShopAndName(item);
+
+    assertThat(actual.getId()).isEqualTo(5L);
+  }
+
+  @Test
   @Sql("/sql/insert-items.sql")
   void 商品を登録できること() {
     Item item = new Item(null, 1L, "肉まん", 8L, true);
@@ -208,6 +291,24 @@ class ItemRepositoryTest {
     assertThat(actual.getItemName()).isEqualTo("肉まん");
     assertThat(actual.getCategoryId()).isEqualTo(8L);
     assertThat(actual.getIsSeasonal()).isTrue();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 商品の登録_同じ店に大文字小文字だけが違う商品名の商品がすでにある場合は例外が発生すること() {
+    Item item = new Item(null, 1L, "LATTE", 10L, false);
+
+    assertThatThrownBy(() -> sut.insertItem(item)).isInstanceOf(DuplicateKeyException.class);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 商品の登録_店が異なれば同じ商品名で登録できること() {
+    Item item = new Item(null, 2L, "Latte", 10L, false);
+
+    sut.insertItem(item);
+
+    assertThat(sut.searchItem(item.getId()).getShopId()).isEqualTo(2L);
   }
 
   @Test
@@ -240,6 +341,25 @@ class ItemRepositoryTest {
     sut.updateItem(item);
 
     assertThat(sut.searchItem(1L).getCategoryId()).isEqualTo(8L);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 商品の更新_ほかの商品と大文字小文字だけが違う商品名に変える場合は例外が発生すること() {
+    // 店1の「Mocha」（id=6）を、同じ店の「Latte」の大文字小文字違いに変える
+    Item item = new Item(6L, null, "latte", 10L, false);
+
+    assertThatThrownBy(() -> sut.updateItem(item)).isInstanceOf(DuplicateKeyException.class);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-letter-case.sql")
+  void 商品の更新_自分自身の大文字小文字だけを変える場合は更新できること() {
+    Item item = new Item(1L, null, "LATTE", 10L, true);
+
+    sut.updateItem(item);
+
+    assertThat(sut.searchItem(1L).getItemName()).isEqualTo("LATTE");
   }
 
   @Test

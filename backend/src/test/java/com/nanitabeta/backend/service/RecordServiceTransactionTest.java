@@ -85,6 +85,46 @@ class RecordServiceTransactionTest {
   }
 
   @Test
+  void 大文字小文字だけが違う新商品が途中でほかのトランザクションに作られても登録できること() {
+    // A は「latte」、B は「Latte」。A は UNIQUE（LOWER(商品名)）で重複になり、ロックを取って読み直す
+    TransactionTemplate transactionA = new TransactionTemplate(transactionManager);
+    TransactionTemplate transactionB = new TransactionTemplate(transactionManager);
+    transactionB.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    Item itemByB = new Item(null, SHOP_ID, "Latte", 10L, false);
+
+    RecordDetail actual = transactionA.execute(status -> {
+      shopRepository.searchShop(SHOP_ID); // A の最初の SELECT。ここで最初のスナップショットが決まる
+      transactionB.executeWithoutResult(statusB -> itemRepository.insertItem(itemByB)); // B が確定
+      RecordDetail recordDetail =
+          sut.registerRecord(input(), new Item(null, SHOP_ID, "latte", 10L, false), List.of());
+      status.setRollbackOnly(); // A の登録は残さない
+      return recordDetail;
+    });
+
+    assertThat(actual.getItem().getId()).isEqualTo(itemByB.getId()); // B が作った商品に記録すること
+    assertThat(actual.getItem().getItemName()).isEqualTo("Latte");
+  }
+
+  @Test
+  void 大文字小文字だけが違う既存の商品がある場合はその商品に記録し商品の内容は変えないこと() {
+    // 既存の「Latte」は ドリンク（10）・季節限定。「latte」・その他（11）・季節限定でない、で記録する
+    Item existing = new Item(null, SHOP_ID, "Latte", 10L, true);
+    itemRepository.insertItem(existing);
+
+    RecordDetail actual =
+        sut.registerRecord(input(), new Item(null, SHOP_ID, "latte", 11L, false), List.of());
+
+    assertThat(actual.getRecord().getItemId()).isEqualTo(existing.getId());
+    Item item = itemRepository.searchItem(existing.getId());
+    assertThat(item.getItemName()).isEqualTo("Latte"); // 保存されている表記のまま
+    assertThat(item.getCategoryId()).isEqualTo(10L);
+    assertThat(item.getIsSeasonal()).isTrue();
+    Integer itemCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM items WHERE shop_id = ?",
+        Integer.class, SHOP_ID);
+    assertThat(itemCount).isEqualTo(1); // 新しい商品は作られていないこと
+  }
+
+  @Test
   void 途中でDBのエラーが起きた場合は商品と記録と写真をまとめて取り消すこと() {
     doThrow(new DataIntegrityViolationException("写真の登録に失敗")).when(recordRepository)
         .insertRecordPhotos(any(), any());

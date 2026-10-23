@@ -11,12 +11,13 @@ VALUES (1, 'スタバ', 20, 1, false),
 INSERT INTO users (id, nickname)
 VALUES ('20b622c8-dd31-46e8-8f1a-64009c7febe5', 'Saki');
 
--- 店1：完全一致「Latte」と、名前順でその前に並ぶ「A01 Latte」〜「A10 Latte」、大文字小文字が違う「latte」
+-- 店1：完全一致「Latte」と、名前順でその前に並ぶ「A01 Latte」〜「A10 Latte」
+-- （大文字小文字だけが違う「latte」は、同じ店には UNIQUE で入れられない。V4）
 INSERT INTO items (shop_id, item_name, category_id, is_seasonal)
 VALUES (1, 'A01 Latte', 10, false), (1, 'A02 Latte', 10, false), (1, 'A03 Latte', 10, false),
        (1, 'A04 Latte', 10, false), (1, 'A05 Latte', 10, false), (1, 'A06 Latte', 10, false),
        (1, 'A07 Latte', 10, false), (1, 'A08 Latte', 10, false), (1, 'A09 Latte', 10, false),
-       (1, 'A10 Latte', 10, false), (1, 'Latte', 10, false), (1, 'latte', 10, false);
+       (1, 'A10 Latte', 10, false), (1, 'Latte', 10, false);
 
 -- 店2：% _ バックスラッシュを含む完全一致「100%_\OFF」と、名前順でその前に並ぶ「0 100%_\OFF 01」〜「10」
 INSERT INTO items (shop_id, item_name, category_id, is_seasonal)
