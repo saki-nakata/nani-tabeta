@@ -58,6 +58,55 @@
     WHERE id = #{id}
   </delete>
 
+  <!-- 記録の一覧（自分の記録だけ。食べた日の新しい順、同じ日は id の大きい順。写真は searchRecordPhotosByRecordIdList で別に取る） -->
+  <select id="searchRecordListCards" resultType="com.nanitabeta.backend.domain.RecordListCard">
+    SELECT records.id, records.eaten_on, records.rating, items.item_name, items.category_id, shops.shop_name
+    FROM records
+      JOIN items ON items.id = records.item_id
+      JOIN shops ON shops.id = items.shop_id
+    WHERE records.user_id = #{userId}
+    <if test="categoryId != null">
+      AND items.category_id = #{categoryId}
+    </if>
+    <if test="shopKindId != null">
+      AND shops.shop_kind_id = #{shopKindId}
+    </if>
+    <if test="eatenFrom != null">
+      AND records.eaten_on &gt;= #{eatenFrom}
+    </if>
+    <if test="eatenTo != null">
+      AND records.eaten_on &lt;= #{eatenTo}
+    </if>
+    <if test="cursorEatenOn != null and cursorId != null">
+      AND (records.eaten_on &lt; #{cursorEatenOn}
+        OR (records.eaten_on = #{cursorEatenOn} AND records.id &lt; #{cursorId}))
+    </if>
+    ORDER BY records.eaten_on DESC, records.id DESC
+    LIMIT #{limit}
+  </select>
+
+  <!-- 指定した記録たちの写真（記録ID・並び順の順。recordIdList は空にしない） -->
+  <select
+    id="searchRecordPhotosByRecordIdList"
+    resultType="com.nanitabeta.backend.data.RecordPhoto"
+  >
+    SELECT record_id, photo_path, sort_order
+    FROM record_photos
+    WHERE record_id IN
+    <foreach collection="recordIdList" item="recordId" open="(" separator="," close=")">
+      #{recordId}
+    </foreach>
+    ORDER BY record_id, sort_order
+  </select>
+
+  <!-- 記録がある年（食べた日の年。新しい順） -->
+  <select id="searchRecordYears" resultType="int">
+    SELECT DISTINCT YEAR(eaten_on) AS eaten_year
+    FROM records
+    WHERE user_id = #{userId}
+    ORDER BY eaten_year DESC
+  </select>
+
   <!-- 記録の写真をすべて削除 -->
   <delete id="deleteRecordPhotos">
     DELETE FROM record_photos
