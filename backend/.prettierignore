@@ -1,0 +1,3 @@
+# Prettier で整形しないファイル（Cursor の保存時の整形で使う）
+# Google からコピーした Java の整形の設定。取得元からの変更を 1 か所だけにしておくため、整形しない
+config/eclipse-java-google-style.xml

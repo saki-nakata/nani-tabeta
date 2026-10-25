@@ -1,0 +1,10 @@
+{
+  "name": "nani-tabeta-backend-tools",
+  "private": true,
+  "description": "バックエンドの開発で使う道具（mapper の XML の整形に使う Prettier）",
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "@prettier/plugin-xml": "3.4.2",
+    "prettier": "3.9.9"
+  }
+}
