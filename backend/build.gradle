@@ -49,6 +49,10 @@ tasks.named('test') {
 	systemProperty 'spring.profiles.active', 'test'
 }
 
+// mapper の XML の整形に使う Prettier の版は、backend/package.json の 1 か所だけに書く（Cursor の保存時の整形と同じ版にするため）
+def formatterDependencies = new groovy.json.JsonSlurper()
+	.parseText(file('package.json').getText('UTF-8')).devDependencies
+
 // Java の整形（Google スタイルの Eclipse 用 XML。config/README.md に取得元を記録）
 spotless {
 	java {
@@ -65,14 +69,10 @@ spotless {
 	format 'xml', {
 		// 対象は mapper の XML だけ
 		target 'src/main/resources/mapper/*.xml'
-		// どこで動かしても同じ結果になるよう、版を固定する
-		prettier(['prettier': '3.9.9', '@prettier/plugin-xml': '3.4.2']).config([
-			'plugins': ['@prettier/plugin-xml'],
-			'parser': 'xml',
-			'tabWidth': 2,
-			'printWidth': 100,
-			// タグの中の文字（SQL）の空白と改行を変えない
-			'xmlWhitespaceSensitivity': 'preserve'
-		])
+		// 版は backend/package.json、整形の設定は backend/.prettierrc.json から読む（Cursor の保存時の整形と同じにするため）
+		prettier([
+			'prettier': formatterDependencies['prettier'],
+			'@prettier/plugin-xml': formatterDependencies['@prettier/plugin-xml']
+		]).configFile('.prettierrc.json')
 	}
 }
