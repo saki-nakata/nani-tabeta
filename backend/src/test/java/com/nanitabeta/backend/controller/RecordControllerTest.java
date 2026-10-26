@@ -352,6 +352,42 @@ class RecordControllerTest {
   }
 
   @Test
+  void 記録の一覧_空の件数は20として検索すること() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+        .thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc.perform(get("/api/records").param("limit", "").with(registeredUser()))
+        .andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20);
+  }
+
+  @Test
+  void 記録の一覧_空の絞り込みとcursorは指定なしとして渡すこと() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+        .thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc
+        .perform(
+            get("/api/records").param("categoryId", "").param("shopKindId", "").param("year", "")
+                .param("cursorEatenOn", "").param("cursorId", "").with(registeredUser()))
+        .andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20); // 最初のページとして検索する
+  }
+
+  @Test
+  void 記録の一覧_cursorの記録IDだけが空の場合は食べた日だけを渡すこと() throws Exception {
+    // Service が「cursor の片方だけ」として 400 にする（Service のテストで確かめている）
+    when(service.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 10, 20), null, 20))
+        .thenThrow(
+            new InvalidSearchConditionException("cursorEatenOn と cursorId は、両方指定するか、両方省略してください。"));
+
+    mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026-10-20").param("cursorId", "")
+        .with(registeredUser())).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void 記録の一覧_分類IDが数値でない場合は400が返ること() throws Exception {
     mockMvc.perform(get("/api/records").param("categoryId", "abc").with(registeredUser()))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
