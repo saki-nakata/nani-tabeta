@@ -3,6 +3,7 @@ package com.nanitabeta.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -12,11 +13,17 @@ import static org.mockito.Mockito.when;
 
 import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
+import com.nanitabeta.backend.data.RecordPhoto;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.RecordDetail;
+import com.nanitabeta.backend.domain.RecordListCard;
+import com.nanitabeta.backend.domain.RecordListCursor;
+import com.nanitabeta.backend.domain.RecordListPage;
+import com.nanitabeta.backend.domain.RecordListQuery;
 import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidCategoryException;
 import com.nanitabeta.backend.exception.InvalidPhotoPathException;
+import com.nanitabeta.backend.exception.InvalidSearchConditionException;
 import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
@@ -24,6 +31,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -39,6 +47,10 @@ class RecordServiceTest {
       USER_ID + "/records/7e1d2c3b-5678-4def-8abc-ba9876543210.webp";
   private static final LocalDate EATEN_ON = LocalDate.of(2026, 9, 27);
   private static final String OTHER_USER_ID = "fa92b95a-22dd-4309-8f76-e53072d5d04c";
+  private static final LocalDate OCTOBER_24 = LocalDate.of(2026, 10, 24);
+  private static final LocalDate OCTOBER_20 = LocalDate.of(2026, 10, 20);
+  private static final String CONDITION_MESSAGE_CURSOR =
+      "cursorEatenOn と cursorId は、両方指定するか、両方省略してください。";
 
   @Mock
   private RecordRepository repository;
@@ -303,5 +315,199 @@ class RecordServiceTest {
 
     verify(repository, never()).deleteRecord(any());
     verify(itemService, never()).deleteItemIfNoRecords(any());
+  }
+
+  /** 一覧の SQL が返すカード（写真の項目はまだ入っていない） */
+  private static RecordListCard card(Long id, LocalDate eatenOn) {
+    return new RecordListCard(id, eatenOn, 4, "からあげ棒", 4L, "セブンイレブン", null, null);
+  }
+
+  /** 写真をつなげたあとのカード */
+  private static RecordListCard cardWithPhotos(Long id, LocalDate eatenOn, String mainPhotoPath,
+      int photoCount) {
+    return new RecordListCard(id, eatenOn, 4, "からあげ棒", 4L, "セブンイレブン", mainPhotoPath, photoCount);
+  }
+
+  /** Repository に渡した検索の条件を取り出す */
+  private RecordListQuery capturedQuery() {
+    ArgumentCaptor<RecordListQuery> captor = ArgumentCaptor.forClass(RecordListQuery.class);
+    verify(repository).searchRecordListCards(captor.capture());
+    return captor.getValue();
+  }
+
+  @Test
+  void 記録の一覧_続きがない場合は取得したカードをすべて返し次の目印はnullにすること() {
+    when(repository.searchRecordListCards(any()))
+        .thenReturn(List.of(card(12L, OCTOBER_24), card(9L, OCTOBER_20)));
+    when(repository.searchRecordPhotosByRecordIdList(List.of(12L, 9L))).thenReturn(List.of());
+    RecordListPage expected = new RecordListPage(
+        List.of(cardWithPhotos(12L, OCTOBER_24, null, 0), cardWithPhotos(9L, OCTOBER_20, null, 0)),
+        null);
+    // 絞り込みはそのまま渡し、件数は続きがあるかを確かめるため 1 件多くする
+    RecordListQuery expectedQuery =
+        RecordListQuery.builder().userId(USER_ID).categoryId(4L).shopKindId(1L).limit(21).build();
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, 4L, 1L, null, null, null, 20);
+
+    assertThat(actual).isEqualTo(expected);
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_続きがある場合はlimit件だけ返し最後のカードから次の目印を作ること() {
+    when(repository.searchRecordListCards(any()))
+        .thenReturn(List.of(card(12L, OCTOBER_24), card(9L, OCTOBER_20), card(7L, OCTOBER_20)));
+    when(repository.searchRecordPhotosByRecordIdList(List.of(12L, 9L))).thenReturn(List.of());
+    RecordListPage expected = new RecordListPage(
+        List.of(cardWithPhotos(12L, OCTOBER_24, null, 0), cardWithPhotos(9L, OCTOBER_20, null, 0)),
+        new RecordListCursor(OCTOBER_20, 9L));
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, null, null, null, 2);
+
+    assertThat(actual).isEqualTo(expected);
+    // 確かめるために多く読んだ 1 件（記録 7）の写真は検索しないこと
+    verify(repository).searchRecordPhotosByRecordIdList(List.of(12L, 9L));
+  }
+
+  @Test
+  void 記録の一覧_年はその年の1月1日から12月31日までの範囲にしcursorはそのまま渡すこと() {
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 1, 1)).eatenTo(LocalDate.of(2026, 12, 31))
+        .cursorEatenOn(OCTOBER_20).cursorId(9L).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, 2026, OCTOBER_20, 9L, 20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_写真はカードの順のままつなげ代表写真は並び順が最小のものにすること() {
+    String photo3 = USER_ID + "/records/3c4d5e6f-9abc-4def-8123-456789abcdef.webp";
+    when(repository.searchRecordListCards(any()))
+        .thenReturn(List.of(card(12L, OCTOBER_24), card(9L, OCTOBER_20), card(7L, OCTOBER_20)));
+    // 写真の SQL は記録ID の順。記録 12 は、並び順 1 の写真が先に来ても 0 の写真を代表にすること
+    when(repository.searchRecordPhotosByRecordIdList(List.of(12L, 9L, 7L)))
+        .thenReturn(List.of(new RecordPhoto(9L, photo3, 0), new RecordPhoto(12L, PHOTO_2, 1),
+            new RecordPhoto(12L, PHOTO_1, 0)));
+    RecordListPage expected = new RecordListPage(
+        List.of(cardWithPhotos(12L, OCTOBER_24, PHOTO_1, 2),
+            cardWithPhotos(9L, OCTOBER_20, photo3, 1), cardWithPhotos(7L, OCTOBER_20, null, 0)),
+        null);
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, null, null, null, 20);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 記録の一覧_カードが0件の場合は写真を検索せず空の一覧を返すこと() {
+    when(repository.searchRecordListCards(any())).thenReturn(List.of());
+    RecordListPage expected = new RecordListPage(List.of(), null);
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, 999L, null, null, null, null, 20);
+
+    assertThat(actual).isEqualTo(expected);
+    verify(repository, never()).searchRecordPhotosByRecordIdList(any());
+  }
+
+  @Test
+  void 記録の一覧_分類IDが0の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, 0L, null, null, null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("分類IDは1以上で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_業態IDが負の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, -1L, null, null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("業態IDは1以上で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_年が1000より前の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, 999, null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("年は1000〜9999で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_年が9999より後の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, 10000, null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("年は1000〜9999で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_年が1000と9999の場合は検索できること() {
+    sut.searchRecordList(USER_ID, null, null, 1000, null, null, 20);
+    sut.searchRecordList(USER_ID, null, null, 9999, null, null, 20);
+
+    verify(repository).searchRecordListCards(
+        argThat(query -> LocalDate.of(1000, 1, 1).equals(query.getEatenFrom())));
+    verify(repository).searchRecordListCards(
+        argThat(query -> LocalDate.of(9999, 12, 31).equals(query.getEatenTo())));
+  }
+
+  @Test
+  void 記録の一覧_cursorの食べた日だけ指定された場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, OCTOBER_20, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage(CONDITION_MESSAGE_CURSOR);
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_cursorの記録IDだけ指定された場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, 9L, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage(CONDITION_MESSAGE_CURSOR);
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_cursorの記録IDが0の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, OCTOBER_20, 0L, 20))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("cursorIdは1以上で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_件数が0の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, null, 0))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("件数は1〜100で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_件数が101の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, null, 101))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("件数は1〜100で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_件数が1と100の場合は1件多く読むこと() {
+    sut.searchRecordList(USER_ID, null, null, null, null, null, 1);
+    sut.searchRecordList(USER_ID, null, null, null, null, null, 100);
+
+    verify(repository).searchRecordListCards(argThat(query -> query.getLimit() == 2));
+    verify(repository).searchRecordListCards(argThat(query -> query.getLimit() == 101));
+  }
+
+  @Test
+  void 記録がある年_Repositoryが返した年をそのまま返すこと() {
+    when(repository.searchRecordYears(USER_ID)).thenReturn(List.of(2026, 2025));
+
+    List<Integer> actual = sut.searchRecordYears(USER_ID);
+
+    assertThat(actual).containsExactly(2026, 2025);
   }
 }
