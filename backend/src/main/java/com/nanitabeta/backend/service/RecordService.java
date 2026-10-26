@@ -2,15 +2,24 @@ package com.nanitabeta.backend.service;
 
 import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
+import com.nanitabeta.backend.data.RecordPhoto;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.RecordDetail;
+import com.nanitabeta.backend.domain.RecordListCard;
+import com.nanitabeta.backend.domain.RecordListCursor;
+import com.nanitabeta.backend.domain.RecordListPage;
+import com.nanitabeta.backend.domain.RecordListQuery;
 import com.nanitabeta.backend.exception.ForbiddenException;
+import com.nanitabeta.backend.exception.InvalidSearchConditionException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
 import com.nanitabeta.backend.util.PhotoPathValidator;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -18,6 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class RecordService {
+
+  /** 一度に読む件数の上限 */
+  private static final int MAX_LIMIT = 100;
+
+  /** 年の絞り込みで指定できる最初の年（MySQL の DATE 型が扱える範囲） */
+  private static final int MIN_YEAR = 1000;
+
+  /** 年の絞り込みで指定できる最後の年（MySQL の DATE 型が扱える範囲） */
+  private static final int MAX_YEAR = 9999;
 
   private RecordRepository repository;
   private ItemService itemService;
@@ -49,6 +67,114 @@ public class RecordService {
     Shop shop = shopService.searchShop(item.getShopId());
     List<String> photoPaths = repository.searchRecordPhotoPaths(id);
     return new RecordDetail(record, item, shop, photoPaths);
+  }
+
+  /**
+   * 利用者の記録の一覧を、カードの形で1回分（limit 件まで）取得します。
+   * <p>
+   * 並びは食べた日の新しい順、同じ日は記録IDの大きい順です。続きがある場合は、続きを読むための目印（最後のカードの食べた日と記録ID）も返します。
+   * <p>
+   * カードと写真は2回に分けて取得するため、同じ時点の DB を読むよう、1つのトランザクション（REPEATABLE READ）で行います。
+   *
+   * @param userId 利用者のID（JWT の sub）
+   * @param categoryId 商品の分類ID（null の場合は絞り込まない）
+   * @param shopKindId 店の業態ID（null の場合は絞り込まない）
+   * @param year 食べた日の年（null の場合は絞り込まない）
+   * @param cursorEatenOn 前回の最後のカードの食べた日（最初の読み込みは null）
+   * @param cursorId 前回の最後のカードの記録ID（最初の読み込みは null）
+   * @param limit 読む件数（1〜100）
+   * @return 記録の一覧の1回分
+   * @throws InvalidSearchConditionException 条件の値が正しくない場合
+   */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public RecordListPage searchRecordList(String userId, Long categoryId, Long shopKindId,
+      Integer year, LocalDate cursorEatenOn, Long cursorId, int limit) {
+    validateRecordListCondition(categoryId, shopKindId, year, cursorEatenOn, cursorId, limit);
+
+    RecordListQuery query = RecordListQuery.builder().userId(userId).categoryId(categoryId)
+        .shopKindId(shopKindId).eatenFrom(year == null ? null : LocalDate.of(year, 1, 1))
+        .eatenTo(year == null ? null : LocalDate.of(year, 12, 31)).cursorEatenOn(cursorEatenOn)
+        .cursorId(cursorId).limit(limit + 1) // 1件多く読み、続きがあるかを確かめる
+        .build();
+    List<RecordListCard> cards = repository.searchRecordListCards(query);
+
+    boolean hasNext = cards.size() > limit;
+    List<RecordListCard> pageCards = hasNext ? cards.subList(0, limit) : cards;
+    attachPhotos(pageCards);
+
+    RecordListCursor nextCursor = null;
+    if (hasNext) {
+      RecordListCard last = pageCards.getLast();
+      nextCursor = new RecordListCursor(last.getEatenOn(), last.getId());
+    }
+    return new RecordListPage(pageCards, nextCursor);
+  }
+
+  /**
+   * 利用者の記録がある年を、新しい順に取得します（年の絞り込みの選択肢に使います）。
+   *
+   * @param userId 利用者のID（JWT の sub）
+   * @return 年の一覧（記録がない場合は空のリスト）
+   */
+  public List<Integer> searchRecordYears(String userId) {
+    return repository.searchRecordYears(userId);
+  }
+
+  /**
+   * 記録の一覧の条件の値を確認します。
+   *
+   * @throws InvalidSearchConditionException 条件の値が正しくない場合
+   */
+  private void validateRecordListCondition(Long categoryId, Long shopKindId, Integer year,
+      LocalDate cursorEatenOn, Long cursorId, int limit) {
+    validatePositiveId("分類ID", categoryId);
+    validatePositiveId("業態ID", shopKindId);
+    if (year != null && (year < MIN_YEAR || year > MAX_YEAR)) {
+      throw new InvalidSearchConditionException("年は" + MIN_YEAR + "〜" + MAX_YEAR + "で指定してください。");
+    }
+    if ((cursorEatenOn == null && cursorId != null)
+        || (cursorEatenOn != null && cursorId == null)) {
+      throw new InvalidSearchConditionException("cursorEatenOn と cursorId は、両方指定するか、両方省略してください。");
+    }
+    validatePositiveId("cursorId", cursorId);
+    if (limit < 1 || limit > MAX_LIMIT) {
+      throw new InvalidSearchConditionException("件数は1〜" + MAX_LIMIT + "で指定してください。");
+    }
+  }
+
+  /**
+   * ID が指定されている場合に、1以上かを確認します。
+   *
+   * @param name ID の名前（エラーのメッセージに使う）
+   * @param id ID（null の場合は確認しない）
+   * @throws InvalidSearchConditionException ID が0以下の場合
+   */
+  private void validatePositiveId(String name, Long id) {
+    if (id != null && id <= 0) {
+      throw new InvalidSearchConditionException(name + "は1以上で指定してください。");
+    }
+  }
+
+  /**
+   * カードに、代表写真のパスと写真の枚数を入れます。
+   * <p>
+   * 写真の検索に渡す記録IDは、利用者自身の一覧のカードから作ります（写真の SQL には持ち主の条件がないため）。 カードの並び順は変えません。
+   *
+   * @param cards 記録のカード（中身を書き換えます）
+   */
+  private void attachPhotos(List<RecordListCard> cards) {
+    if (cards.isEmpty()) {
+      return; // 空のリストを渡すと SQL の IN () がエラーになるため、写真を検索しない
+    }
+    List<Long> recordIdList = cards.stream().map(card -> card.getId()).toList();
+    List<RecordPhoto> photos = repository.searchRecordPhotosByRecordIdList(recordIdList);
+    for (RecordListCard card : cards) {
+      List<RecordPhoto> cardPhotos =
+          photos.stream().filter(photo -> card.getId().equals(photo.getRecordId())).toList();
+      card.setPhotoCount(cardPhotos.size());
+      card.setMainPhotoPath(cardPhotos.stream().min(Comparator.comparing(RecordPhoto::getSortOrder))
+          .map(photo -> photo.getPhotoPath()).orElse(null));
+    }
   }
 
   /**

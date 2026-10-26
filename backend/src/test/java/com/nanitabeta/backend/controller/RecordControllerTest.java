@@ -3,6 +3,7 @@ package com.nanitabeta.backend.controller;
 import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,8 +21,12 @@ import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
 import com.nanitabeta.backend.data.Shop;
 import com.nanitabeta.backend.domain.RecordDetail;
+import com.nanitabeta.backend.domain.RecordListCard;
+import com.nanitabeta.backend.domain.RecordListCursor;
+import com.nanitabeta.backend.domain.RecordListPage;
 import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidPhotoPathException;
+import com.nanitabeta.backend.exception.InvalidSearchConditionException;
 import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.RecordService;
@@ -314,5 +319,128 @@ class RecordControllerTest {
 
     mockMvc.perform(delete("/api/records/999").with(registeredUser()))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void 記録の一覧_省略した条件はnullで件数は20としてJWTのsubで検索しJSONが返ること() throws Exception {
+    RecordListCard card =
+        new RecordListCard(12L, LocalDate.of(2026, 10, 24), 4, "からあげ棒", 4L, "セブンイレブン", PHOTO, 2);
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20)).thenReturn(
+        new RecordListPage(List.of(card), new RecordListCursor(LocalDate.of(2026, 10, 24), 12L)));
+
+    mockMvc.perform(get("/api/records").with(registeredUser())).andExpect(status().isOk())
+        .andExpect(content().json("""
+            {"records": [{"id": 12, "eatenOn": "2026-10-24", "rating": 4, "itemName": "からあげ棒",
+                          "categoryId": 4, "shopName": "セブンイレブン", "mainPhotoPath": "%s",
+                          "photoCount": 2}],
+             "nextCursor": {"eatenOn": "2026-10-24", "id": 12}}
+            """.formatted(PHOTO)));
+  }
+
+  @Test
+  void 記録の一覧_絞り込みとcursorと件数をパラメータから受け取ること() throws Exception {
+    when(service.searchRecordList(USER_ID, 2L, 1L, 2026, LocalDate.of(2026, 10, 20), 9L, 10))
+        .thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc
+        .perform(get("/api/records").param("categoryId", "2").param("shopKindId", "1")
+            .param("year", "2026").param("cursorEatenOn", "2026-10-20").param("cursorId", "9")
+            .param("limit", "10").with(registeredUser()))
+        .andExpect(status().isOk()).andExpect(content().json("""
+            {"records": [], "nextCursor": null}
+            """));
+  }
+
+  @Test
+  void 記録の一覧_空の件数は20として検索すること() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+        .thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc.perform(get("/api/records").param("limit", "").with(registeredUser()))
+        .andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20);
+  }
+
+  @Test
+  void 記録の一覧_空の絞り込みとcursorは指定なしとして渡すこと() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+        .thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc
+        .perform(
+            get("/api/records").param("categoryId", "").param("shopKindId", "").param("year", "")
+                .param("cursorEatenOn", "").param("cursorId", "").with(registeredUser()))
+        .andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20); // 最初のページとして検索する
+  }
+
+  @Test
+  void 記録の一覧_cursorの記録IDだけが空の場合は食べた日だけを渡すこと() throws Exception {
+    // Service が「cursor の片方だけ」として 400 にする（Service のテストで確かめている）
+    when(service.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 10, 20), null, 20))
+        .thenThrow(
+            new InvalidSearchConditionException("cursorEatenOn と cursorId は、両方指定するか、両方省略してください。"));
+
+    mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026-10-20").param("cursorId", "")
+        .with(registeredUser())).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 記録の一覧_分類IDが数値でない場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").param("categoryId", "abc").with(registeredUser()))
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "リクエストのパラメータが正しくありません。"}
+            """));
+
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+  }
+
+  @Test
+  void 記録の一覧_cursorの食べた日が存在しない日付の場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026-13-01").param("cursorId", "9")
+        .with(registeredUser())).andExpect(status().isBadRequest());
+
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+  }
+
+  @Test
+  void 記録の一覧_cursorの食べた日が年月日のハイフン区切りでない場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026/10/20").param("cursorId", "9")
+        .with(registeredUser())).andExpect(status().isBadRequest());
+
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+  }
+
+  @Test
+  void 記録の一覧_条件の値が範囲の外の場合は400とServiceのメッセージが返ること() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, 101))
+        .thenThrow(new InvalidSearchConditionException("件数は1〜100で指定してください。"));
+
+    mockMvc.perform(get("/api/records").param("limit", "101").with(registeredUser()))
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "件数は1〜100で指定してください。"}
+            """));
+  }
+
+  @Test
+  void 記録の一覧_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(get("/api/records")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 記録がある年_JWTのsubの利用者の年が返ること() throws Exception {
+    when(service.searchRecordYears(USER_ID)).thenReturn(List.of(2026, 2025));
+
+    // /api/records/{id} ではなく、こちらに来ること（{id} に来ると数値でないため 400 になる）
+    mockMvc.perform(get("/api/records/years").with(registeredUser())).andExpect(status().isOk())
+        .andExpect(content().json("[2026, 2025]"));
+  }
+
+  @Test
+  void 記録がある年_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(get("/api/records/years")).andExpect(status().isUnauthorized());
   }
 }

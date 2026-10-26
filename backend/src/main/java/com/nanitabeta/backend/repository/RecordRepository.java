@@ -1,6 +1,9 @@
 package com.nanitabeta.backend.repository;
 
 import com.nanitabeta.backend.data.FoodRecord;
+import com.nanitabeta.backend.data.RecordPhoto;
+import com.nanitabeta.backend.domain.RecordListCard;
+import com.nanitabeta.backend.domain.RecordListQuery;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -37,6 +40,38 @@ public interface RecordRepository {
    * @param record 記録
    */
   void insertRecord(FoodRecord record);
+
+  /**
+   * 利用者の記録を、一覧のカードの形で取得します。
+   * <p>
+   * 並びは食べた日の新しい順、同じ日は記録IDの大きい順（登録の新しい順）です。 cursor を指定した場合は、その記録より後ろだけを返します。
+   * <p>
+   * 写真（代表写真のパス・写真の枚数）は含みません（null のまま返します）。 写真は {@link #searchRecordPhotosByRecordIdList(List)}
+   * で別に取得します。
+   *
+   * @param query 検索の条件（絞り込み・cursor・件数）
+   * @return 記録のカードの一覧（該当がない場合は空のリスト）
+   */
+  List<RecordListCard> searchRecordListCards(RecordListQuery query);
+
+  /**
+   * 指定した記録たちの写真を、記録ID・並び順の順でまとめて取得します。
+   * <p>
+   * 空のリストは渡さないでください（SQL の IN () が空になり、エラーになるため）。
+   *
+   * @param recordIdList 記録IDの一覧
+   * @return 写真の一覧（写真がない場合は空のリスト）
+   */
+  List<RecordPhoto> searchRecordPhotosByRecordIdList(
+      @Param("recordIdList") List<Long> recordIdList);
+
+  /**
+   * 利用者の記録がある年（食べた日の年）を、新しい順に取得します。
+   *
+   * @param userId 利用者のID
+   * @return 年の一覧（記録がない場合は空のリスト）
+   */
+  List<Integer> searchRecordYears(String userId);
 
   /**
    * 記録の写真のパスを、並び順（先頭が代表写真）で取得します。

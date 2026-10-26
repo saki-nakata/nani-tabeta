@@ -137,6 +137,21 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 一覧の検索の条件が正しくない場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 400 とエラー内容
+   */
+  @ExceptionHandler(InvalidSearchConditionException.class)
+  public ResponseEntity<ErrorMessage> handleInvalidSearchCondition(
+      InvalidSearchConditionException ex) {
+    log.warn("正しくない検索の条件が指定されました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.BAD_REQUEST;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * 対象は存在するが、操作する権限がない場合の例外を処理します。
    *
    * @param ex 発生した例外
