@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { getPhotoUrls } from "./url";
+import { getPhotoUrls, getPhotoUrlsOrNull } from "./url";
 
 // Supabase の窓口を偽物にして、どのバケット・どの場所で URL を作ったかを確かめる
 const { createClient, from, getPublicUrl } = vi.hoisted(() => {
@@ -47,6 +47,39 @@ describe("getPhotoUrls", () => {
     const actual = await getPhotoUrls([]);
 
     expect(actual).toEqual([]);
+    expect(getPublicUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("getPhotoUrlsOrNull", () => {
+  test("写真がない（null）ところは null のまま、ほかは公開 URL にして、並びを変えないこと", async () => {
+    const actual = await getPhotoUrlsOrNull([
+      null,
+      "u1/records/a.webp",
+      null,
+      "u1/records/b.webp",
+    ]);
+
+    expect(actual).toEqual([
+      null,
+      "https://example.supabase.co/public/photos/u1/records/a.webp",
+      null,
+      "https://example.supabase.co/public/photos/u1/records/b.webp",
+    ]);
+    expect(getPublicUrl).toHaveBeenCalledTimes(2); // null のところでは URL を作らない
+  });
+
+  test("写真を置いたときと同じ photos バケットを使い、Supabase の窓口の用意は 1 回だけであること", async () => {
+    await getPhotoUrlsOrNull(["a.webp", null, "c.webp"]);
+
+    expect(from).toHaveBeenCalledWith("photos");
+    expect(createClient).toHaveBeenCalledTimes(1);
+  });
+
+  test("全部 null なら、全部 null のまま返すこと", async () => {
+    const actual = await getPhotoUrlsOrNull([null, null]);
+
+    expect(actual).toEqual([null, null]);
     expect(getPublicUrl).not.toHaveBeenCalled();
   });
 });

@@ -83,7 +83,9 @@ export default async function RecordPage({
     <main className="flex flex-1 flex-col items-center px-4 py-8">
       <article className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold break-words">{item.itemName}</h1>
+          <h1 className="font-heading text-2xl font-bold break-words">
+            {item.itemName}
+          </h1>
           {(category || item.isSeasonal) && (
             <div className="flex flex-wrap gap-2">
               {category && (
@@ -119,7 +121,7 @@ export default async function RecordPage({
 
         <p className="text-2xl">
           <span aria-hidden="true">
-            <span className="text-amber-400">{"★".repeat(record.rating)}</span>
+            <span className="text-rating">{"★".repeat(record.rating)}</span>
             <span className="text-muted-foreground/30">
               {"★".repeat(5 - record.rating)}
             </span>

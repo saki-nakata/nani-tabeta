@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { RecordDetail, RecordInput } from "@/types/record";
+import type { RecordDetail, RecordInput, RecordListPage } from "@/types/record";
 import { ApiError } from "./client";
-import { registerRecord, searchRecord } from "./records";
+import {
+  registerRecord,
+  searchRecord,
+  searchRecordList,
+  searchRecordYears,
+} from "./records";
 
 // 本物の ApiError は使い、apiFetch だけを偽物に差し替える
 const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
@@ -94,5 +99,135 @@ describe("searchRecord", () => {
     const actual = searchRecord(999);
 
     await expect(actual).rejects.toBe(expected);
+  });
+});
+
+describe("searchRecordList", () => {
+  const allFilter = { categoryId: null, shopKindId: null, year: null };
+  const noRange = { eatenFrom: null, eatenTo: null };
+  const recordListPage: RecordListPage = {
+    records: [
+      {
+        id: 13,
+        eatenOn: "2026-10-25",
+        rating: 3,
+        itemName: "ラテ",
+        categoryId: 10,
+        shopName: "スタバ",
+        mainPhotoPath: null,
+        photoCount: 0,
+      },
+    ],
+    nextCursor: { eatenOn: "2026-10-25", id: 13 },
+  };
+
+  test("絞り込みがすべて「すべて」で cursor がないときは、パラメータを付けずに GET /api/records を呼び、1 回分を返すこと", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    const actual = await searchRecordList(allFilter, noRange, null);
+
+    expect(actual).toEqual(recordListPage);
+    expect(apiFetch).toHaveBeenCalledWith("/api/records");
+  });
+
+  test("「すべて」でない絞り込みだけをパラメータにすること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(
+      { categoryId: 2, shopKindId: null, year: 2026 },
+      noRange,
+      null,
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/records?categoryId=2&year=2026",
+    );
+  });
+
+  test("3 つの絞り込みをすべてパラメータにできること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(
+      { categoryId: 2, shopKindId: 6, year: 2025 },
+      noRange,
+      null,
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/records?categoryId=2&shopKindId=6&year=2025",
+    );
+  });
+
+  test("cursor があるときは、食べた日と記録 ID を 2 つそろえて、絞り込みのあとに付けること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(
+      { categoryId: 2, shopKindId: null, year: 2026 },
+      noRange,
+      { eatenOn: "2026-10-25", id: 13 },
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/records?categoryId=2&year=2026&cursorEatenOn=2026-10-25&cursorId=13",
+    );
+  });
+
+  test("絞り込みが「すべて」で cursor だけがあるときは、cursor の 2 つだけを付けること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(allFilter, noRange, {
+      eatenOn: "2026-09-26",
+      id: 2,
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/records?cursorEatenOn=2026-09-26&cursorId=2",
+    );
+  });
+
+  test("読めなかった（401 など）ときは、そのまま投げること（0 件として扱わないため）", async () => {
+    const expected = new ApiError(401, "ログインしていません。");
+    apiFetch.mockRejectedValue(expected);
+
+    const actual = searchRecordList(allFilter, noRange, null);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+
+  test("範囲（今日だけ）は、絞り込みのあと・cursor の前に、eatenFrom と eatenTo を付けること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(
+      { categoryId: 2, shopKindId: null, year: null },
+      { eatenFrom: "2026-11-03", eatenTo: "2026-11-03" },
+      { eatenOn: "2026-11-03", id: 30 },
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/records?categoryId=2&eatenFrom=2026-11-03&eatenTo=2026-11-03&cursorEatenOn=2026-11-03&cursorId=30",
+    );
+  });
+
+  test("範囲の片側（昨日まで）だけのときは、eatenTo だけを付けること", async () => {
+    apiFetch.mockResolvedValue(recordListPage);
+
+    await searchRecordList(
+      allFilter,
+      { eatenFrom: null, eatenTo: "2026-11-02" },
+      null,
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/records?eatenTo=2026-11-02");
+  });
+});
+
+describe("searchRecordYears", () => {
+  test("GET /api/records/years を呼び、年の一覧を返すこと", async () => {
+    apiFetch.mockResolvedValue([2026, 2025]);
+
+    const actual = await searchRecordYears();
+
+    expect(actual).toEqual([2026, 2025]);
+    expect(apiFetch).toHaveBeenCalledWith("/api/records/years");
   });
 });

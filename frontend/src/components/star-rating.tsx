@@ -26,7 +26,7 @@ export function StarRating({ value, onChange }: StarRatingProps) {
             className={cn(
               "size-7",
               star <= value
-                ? "fill-amber-400 text-amber-400"
+                ? "fill-rating text-rating"
                 : "text-muted-foreground",
             )}
           />
