@@ -20,6 +20,33 @@ Spotless が npm で入れるものと、Cursor 用に pnpm で入れるもの�
 入れ直したときに整形の結果が変われば `spotlessCheck` で気づけますが、依存の変化そのものや、前と同じ環境に戻せることまでは保証しません。
 Spotless は `check` に `spotlessCheck` をつなぐので、Node.js のない環境では `./gradlew build` も失敗します。
 
+## Java の保存時の整形（Cursor）
+
+Cursor で Java を保存（Ctrl+S）したときも、Spotless と同じ XML（下の `eclipse-java-google-style.xml`）と同じ import の順で整形します（Java の拡張機能 `redhat.java` を使う）。
+
+**Cursor の設定（各自のローカル設定）**
+
+`.vscode/settings.json` は Git の管理外なので、clone しただけでは保存時の整形はそろいません。次を足します。`<リポジトリの場所>` は、自分の PC で clone した場所に合わせます。
+
+```json
+"java.format.settings.url": "file:///C:/<リポジトリの場所>/backend/config/eclipse-java-google-style.xml",
+"java.completion.importOrder": ["#", ""]
+```
+
+| 設定 | 意味 |
+|---|---|
+| `java.format.settings.url` | 整形のルールの XML の場所 |
+| `java.completion.importOrder` | import の並び。`#` は static import、`""` はそのほか（Spotless の `importOrder('\\#', '')` と同じ） |
+
+保存時の整形（`editor.formatOnSave`）が有効になっていることも確かめます（ユーザー設定か、`"[java]": { "editor.formatOnSave": true }`）。
+
+**パスの前に `file:///` を付ける**
+
+`"C:/…"` のように書くと、Java の拡張機能が `C:` を URL の種類（`http:` などと同じ所）と読みとり、`unknown protocol: c` で XML を読めません。
+このときエラーで止まらず、拡張機能の既定の整形になるので、保存するたびに Spotless とちがう形に整形されます（Java の拡張機能のログに `unknown protocol: c` が出ます）。
+
+保存時の整形は補助です。正は Spotless の結果なので、ずれたときは `./gradlew spotlessApply` で直します。
+
 ## mapper の XML の保存時の整形（Cursor）
 
 Cursor で mapper の XML を保存（Ctrl+S）したときも、Spotless と同じ Prettier・同じ設定で整形します。

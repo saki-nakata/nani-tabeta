@@ -5,15 +5,20 @@
 
 ## 開発状況
 
-バックエンドを実装中です。マスタ参照・店・商品の API と、認証（JWT の検証・ユーザー登録）まで完成しています。
+バックエンドとフロントエンドを、機能ごとに画面まで作っています。
+今は、次のところまで動きます。
+
+- Google でのログインとユーザー登録
+- 記録の登録（店・商品の候補、写真）と、記録の詳細
+- 記録の一覧（分類・業態・年での絞り込み、今日の記録、無限スクロール）
 
 - [x] 要件定義
 - [x] ER図・テーブル設計
 - [x] 技術選定
 - [x] 環境構築（Spring Boot / MySQL / Next.js）
 - [x] DB設計・マイグレーション
-- [ ] バックエンド実装
-- [ ] フロントエンド実装
+- [ ] バックエンド実装（実装中）
+- [ ] フロントエンド実装（実装中）
 - [ ] デプロイ
 
 ## 技術構成
@@ -22,18 +27,19 @@
 
 | 領域 | 技術 |
 |---|---|
-| フロントエンド | Next.js 16.3.4 (App Router) / React 19.2.8 / TypeScript 5.9 / Tailwind CSS v4 |
+| フロントエンド | Next.js 16.4.3 (App Router) / React 19.3.1 / TypeScript 5.9 / Tailwind CSS v4 |
+| UIコンポーネント | shadcn/ui（横スクロールの Carousel は Embla Carousel）/ next-themes（ライト・ダーク） |
 | バックエンド | Java 25 / Spring Boot 4.0.8 / MyBatis / Flyway |
 | データベース | MySQL 8.4（Docker Compose）|
-| 認証（サーバー側） | Spring Security による Supabase Auth の JWT 検証 |
+| 認証 | Supabase Auth（Google OAuth）。サーバー側は Spring Security で JWT を検証 |
+| ファイル保存 | Supabase Storage（記録の写真） |
+| テスト | Vitest（フロントエンド）/ JUnit・Spring Boot Test（バックエンド） |
+| 整形 | Prettier（フロントエンド）/ Spotless（バックエンド） |
 
 ### 今後実装
 
 | 領域 | 技術 |
 |---|---|
-| 認証（ログイン画面） | Supabase Auth（Google OAuth） |
-| ファイル保存 | Supabase Storage |
-| UIコンポーネント | shadcn/ui |
 | 外部API | Google Places API（店名の入力補助）|
 | デプロイ | Vercel（フロントエンド）/ Railway（バックエンド＋MySQL）|
 
@@ -41,9 +47,9 @@
 
 | ソフトウェア | 要件 | 動作確認したバージョン |
 |---|---|---|
-| JDK | 25 | Eclipse Temurin 25.0.4.1 |
+| JDK | 25 | Oracle JDK 25.0.5.0.2 |
 | Docker Desktop | - | 28.2.2 |
-| Node.js | 20.9 以上 | 24.11.0 |
+| Node.js | 20.9 以上 | 24.22.1 |
 | pnpm | 11 以上 | 11.9.0 |
 
 Gradle は Wrapper が同梱されているため、個別のインストールは不要です。
@@ -79,7 +85,46 @@ SUPABASE_URL=https://<project-ref>.supabase.co
 - **末尾に `/` を付けないでください。** 付けると `…supabase.co//auth/v1` になり、すべての JWT が検証に失敗します
 - `/rest/v1/` など、後ろのパスも付けません
 
-`.env` は Git 管理外です。コミットしないでください。
+フロントエンド用に、`frontend/.env.local` も用意します。
+
+```powershell
+Copy-Item frontend/.env.sample frontend/.env.local
+```
+
+`frontend/.env.local` を開き、次の値を設定します。
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=（publishable key）
+API_BASE_URL=http://localhost:8080
+```
+
+| 項目 | 内容 |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | 上の `SUPABASE_URL` と同じ Project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase のダッシュボードの **Project Settings → API Keys** にある publishable key（ブラウザに渡してよいキー） |
+| `API_BASE_URL` | Spring Boot の API の場所。Next.js のサーバーだけが使い、ブラウザには渡しません |
+
+`.env` と `frontend/.env.local` は Git 管理外です。コミットしないでください。
+
+#### Supabase の準備
+
+このアプリは、Supabase のプロジェクトで次の設定が済んでいることを前提にしています。
+新しいプロジェクトを使う場合は、ダッシュボードで用意してください。
+
+| 項目 | 前提にしている設定 | コードの場所 |
+|---|---|---|
+| Google ログイン | **Authentication → Sign In / Providers** で Google を有効にする（Google Cloud の OAuth クライアントが必要） | `frontend/src/components/login-button.tsx` |
+| ログイン後の戻り先 | **Authentication → URL Configuration** の Redirect URLs に `http://localhost:3000/auth/callback` を入れる | `frontend/src/app/auth/callback/route.ts` |
+| 写真のバケット | **Storage** に `photos` という名前の**公開（Public）**バケットを作る（表示は公開 URL で行う）。1 枚の上限は 1MB、許可する形式は `image/webp` だけ（写真はブラウザで WebP に変換してから置く） | `frontend/src/lib/photos/` |
+| 写真を置ける場所 | ログインした人が、自分のフォルダ（パスの先頭が自分のユーザー ID：`<ユーザー ID>/records/…`）にだけ置けるよう、Storage のポリシー（`INSERT`）を設定する | `frontend/src/lib/photos/upload.ts` の `uploadPhoto` |
+| 写真の後片付け | 写真を置いている途中や、記録の登録に失敗したときに、置いた写真を消す。そのため、自分のフォルダの写真を削除できるよう、ポリシー（`DELETE`）も設定する | `frontend/src/lib/photos/upload.ts` の `deletePhotos` |
+| 写真の参照 | 今のプロジェクトには、自分のフォルダの写真を参照できるポリシー（`SELECT`）もある。`deletePhotos` は、削除の結果として返ってくる一覧で、消せたかを確かめている | `frontend/src/lib/photos/upload.ts` の `deletePhotos` |
+
+ポリシーは 3 つとも、対象を `authenticated`（ログインした人）にし、条件を「`photos` バケットで、パスの先頭のフォルダが自分のユーザー ID」にしています。
+
+ポリシーの考え方は、[技術選定](docs/技術選定.md) の「なぜ Supabase Storage か」にあります。
+アップロードに要るポリシーは、Supabase の公式ドキュメント [Storage Access Control](https://supabase.com/docs/guides/storage/security/access-control) の「Access policies」に書かれています（アップロードは `storage.objects` への `INSERT` だけ。上書き（upsert）するときは `SELECT` と `UPDATE` も要る）。
 
 ### 3. MySQL を起動する
 
@@ -128,9 +173,16 @@ pnpm dev              # http://localhost:3000
 | テスト用DBに接続 | `docker compose exec db mysql --default-character-set=utf8mb4 -u nani_tabeta -p nani_tabeta_test` | ルート |
 | バックエンドのテスト | `.\gradlew test` | `backend` |
 | バックエンドの起動 | `.\gradlew bootRun` | `backend` |
+| バックエンドの整形 | `.\gradlew spotlessApply` | `backend` |
+| バックエンドの整形の確認 | `.\gradlew spotlessCheck` | `backend` |
 | フロントエンドの起動 | `pnpm dev` | `frontend` |
+| フロントエンドのテスト | `pnpm test` | `frontend` |
 | 静的検査 | `pnpm lint` | `frontend` |
+| フロントエンドの整形 | `pnpm format` | `frontend` |
+| フロントエンドの整形の確認 | `pnpm format:check` | `frontend` |
 | 本番ビルドの確認 | `pnpm build` | `frontend` |
+
+バックエンドの整形のしくみ（Spotless・エディタの保存時の整形）は、[backend/config/README.md](backend/config/README.md) にまとめています。
 
 ### MySQL に接続するときの注意（Windows）
 
@@ -162,9 +214,11 @@ UTF-8 でないと、日本語が `?` や空文字になったまま登録され
 
 ```
 backend/src/main/resources/db/migration/
-├── V1__init.sql                              テーブル定義（12テーブル）
-├── V2__master_data.sql                       マスタの初期データ
-└── V3__use_japanese_collation_for_names.sql  店名・商品名の照合順序
+├── V1__init.sql                                テーブル定義（12テーブル）
+├── V2__master_data.sql                         マスタの初期データ
+├── V3__use_japanese_collation_for_names.sql    店名・商品名の照合順序
+├── V4__ignore_letter_case_in_item_names.sql    商品名の英字の大文字小文字を区別しない
+└── V5__distinguish_kana_in_shop_names.sql      店名のひらがなとカタカナを区別する
 ```
 
 | 決まりごと | 内容 |
@@ -195,7 +249,7 @@ cd backend
 .\gradlew bootRun        # V1 から再適用される
 ```
 
-**`main` にマージした後は、既存ファイルを変更せず、`V3__xxx.sql` のように追加します。**
+**`main` にマージした後は、既存ファイルを変更せず、`V6__xxx.sql` のように次の番号で追加します。**
 他の環境（本番を含む）に適用済みのファイルは、もう書き換えられないためです。
 
 ### テスト用データベース
@@ -207,7 +261,7 @@ cd backend
 |---|---|
 | 接続先の切り替え | `backend/src/test/resources/application-test.yaml` で接続先の URL だけを上書きする |
 | 切り替えの有効化 | `backend/build.gradle` の `test` タスクで `spring.profiles.active=test` を指定する（テストクラスごとの指定は不要）|
-| テーブルとマスタデータ | テストの実行時に Flyway が `V1`・`V2` を適用する（テスト専用の `schema.sql` や `data.sql` は置かない）|
+| テーブルとマスタデータ | テストの実行時に Flyway が、開発用と同じマイグレーション（`V1` から順に全部）を適用する（テスト専用の `schema.sql` や `data.sql` は置かない）|
 | DB の作成 | `docker/mysql/init/01_create_test_database.sql` |
 
 #### 新しく clone した場合
