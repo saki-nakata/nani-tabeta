@@ -31,10 +31,10 @@ public class RecordService {
   /** 一度に読む件数の上限 */
   private static final int MAX_LIMIT = 100;
 
-  /** 年の絞り込みで指定できる最初の年（MySQL の DATE 型が扱える範囲） */
+  /** 年の絞り込み・食べた日の範囲で指定できる最初の年（MySQL の DATE 型が扱える範囲） */
   private static final int MIN_YEAR = 1000;
 
-  /** 年の絞り込みで指定できる最後の年（MySQL の DATE 型が扱える範囲） */
+  /** 年の絞り込み・食べた日の範囲で指定できる最後の年（MySQL の DATE 型が扱える範囲） */
   private static final int MAX_YEAR = 9999;
 
   private RecordRepository repository;
@@ -80,6 +80,8 @@ public class RecordService {
    * @param categoryId 商品の分類ID（null の場合は絞り込まない）
    * @param shopKindId 店の業態ID（null の場合は絞り込まない）
    * @param year 食べた日の年（null の場合は絞り込まない）
+   * @param eatenFrom 食べた日の範囲の最初の日（この日を含む。null の場合は制限しない）
+   * @param eatenTo 食べた日の範囲の最後の日（この日を含む。null の場合は制限しない）
    * @param cursorEatenOn 前回の最後のカードの食べた日（最初の読み込みは null）
    * @param cursorId 前回の最後のカードの記録ID（最初の読み込みは null）
    * @param limit 読む件数（1〜100）
@@ -88,12 +90,21 @@ public class RecordService {
    */
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public RecordListPage searchRecordList(String userId, Long categoryId, Long shopKindId,
-      Integer year, LocalDate cursorEatenOn, Long cursorId, int limit) {
-    validateRecordListCondition(categoryId, shopKindId, year, cursorEatenOn, cursorId, limit);
+      Integer year, LocalDate eatenFrom, LocalDate eatenTo, LocalDate cursorEatenOn, Long cursorId,
+      int limit) {
+    validateRecordListCondition(categoryId, shopKindId, year, eatenFrom, eatenTo, cursorEatenOn,
+        cursorId, limit);
+
+    // 年（その年の1月1日〜12月31日）と食べた日の範囲を重ねる。最初の日は遅い方、最後の日は早い方
+    LocalDate from = fromDate(year == null ? null : LocalDate.of(year, 1, 1), eatenFrom);
+    LocalDate to = toDate(year == null ? null : LocalDate.of(year, 12, 31), eatenTo);
+    if (from != null && to != null && from.isAfter(to)) {
+      // 正しい条件どうしが重ならないので、該当なし（入力の範囲が逆のときは、上のチェックで 400 にしている）
+      return new RecordListPage(List.of(), null);
+    }
 
     RecordListQuery query = RecordListQuery.builder().userId(userId).categoryId(categoryId)
-        .shopKindId(shopKindId).eatenFrom(year == null ? null : LocalDate.of(year, 1, 1))
-        .eatenTo(year == null ? null : LocalDate.of(year, 12, 31)).cursorEatenOn(cursorEatenOn)
+        .shopKindId(shopKindId).eatenFrom(from).eatenTo(to).cursorEatenOn(cursorEatenOn)
         .cursorId(cursorId).limit(limit + 1) // 1件多く読み、続きがあるかを確かめる
         .build();
     List<RecordListCard> cards = repository.searchRecordListCards(query);
@@ -126,11 +137,16 @@ public class RecordService {
    * @throws InvalidSearchConditionException 条件の値が正しくない場合
    */
   private void validateRecordListCondition(Long categoryId, Long shopKindId, Integer year,
-      LocalDate cursorEatenOn, Long cursorId, int limit) {
+      LocalDate eatenFrom, LocalDate eatenTo, LocalDate cursorEatenOn, Long cursorId, int limit) {
     validatePositiveId("分類ID", categoryId);
     validatePositiveId("業態ID", shopKindId);
     if (year != null && (year < MIN_YEAR || year > MAX_YEAR)) {
       throw new InvalidSearchConditionException("年は" + MIN_YEAR + "〜" + MAX_YEAR + "で指定してください。");
+    }
+    validateDateYear("eatenFrom", eatenFrom);
+    validateDateYear("eatenTo", eatenTo);
+    if (eatenFrom != null && eatenTo != null && eatenFrom.isAfter(eatenTo)) {
+      throw new InvalidSearchConditionException("eatenFrom は、eatenTo と同じ日か、それより前の日を指定してください。");
     }
     if ((cursorEatenOn == null && cursorId != null)
         || (cursorEatenOn != null && cursorId == null)) {
@@ -140,6 +156,58 @@ public class RecordService {
     if (limit < 1 || limit > MAX_LIMIT) {
       throw new InvalidSearchConditionException("件数は1〜" + MAX_LIMIT + "で指定してください。");
     }
+  }
+
+  /**
+   * 日付が指定されている場合に、その年が1000〜9999年かを確認します（MySQL の DATE 型が扱える範囲）。
+   *
+   * @param name 日付の名前（エラーのメッセージに使う）
+   * @param date 日付（null の場合は確認しない）
+   * @throws InvalidSearchConditionException 年が範囲の外の場合
+   */
+  private void validateDateYear(String name, LocalDate date) {
+    if (date != null && (date.getYear() < MIN_YEAR || date.getYear() > MAX_YEAR)) {
+      throw new InvalidSearchConditionException(
+          name + "は" + MIN_YEAR + "〜" + MAX_YEAR + "年の日付で指定してください。");
+    }
+  }
+
+  /**
+   * 2つの範囲の最初の日を重ねて、重なった範囲の最初の日（遅い方）を返します。
+   * <p>
+   * 例：「1月1日から」と「10月1日から」の両方を満たすのは「10月1日から」です。
+   *
+   * @param first 最初の日（null の場合は制限なしとして、もう片方を返す）
+   * @param second 最初の日（null の場合は制限なしとして、もう片方を返す）
+   * @return 遅い方の日付（両方とも null の場合は null）
+   */
+  private LocalDate fromDate(LocalDate first, LocalDate second) {
+    if (first == null) {
+      return second;
+    }
+    if (second == null) {
+      return first;
+    }
+    return first.isAfter(second) ? first : second;
+  }
+
+  /**
+   * 2つの範囲の最後の日を重ねて、重なった範囲の最後の日（早い方）を返します。
+   * <p>
+   * 例：「12月31日まで」と「11月2日まで」の両方を満たすのは「11月2日まで」です。
+   *
+   * @param first 最後の日（null の場合は制限なしとして、もう片方を返す）
+   * @param second 最後の日（null の場合は制限なしとして、もう片方を返す）
+   * @return 早い方の日付（両方とも null の場合は null）
+   */
+  private LocalDate toDate(LocalDate first, LocalDate second) {
+    if (first == null) {
+      return second;
+    }
+    if (second == null) {
+      return first;
+    }
+    return first.isBefore(second) ? first : second;
   }
 
   /**

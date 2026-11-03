@@ -325,8 +325,9 @@ class RecordControllerTest {
   void 記録の一覧_省略した条件はnullで件数は20としてJWTのsubで検索しJSONが返ること() throws Exception {
     RecordListCard card =
         new RecordListCard(12L, LocalDate.of(2026, 10, 24), 4, "からあげ棒", 4L, "セブンイレブン", PHOTO, 2);
-    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20)).thenReturn(
-        new RecordListPage(List.of(card), new RecordListCursor(LocalDate.of(2026, 10, 24), 12L)));
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, null, null, 20))
+        .thenReturn(new RecordListPage(List.of(card),
+            new RecordListCursor(LocalDate.of(2026, 10, 24), 12L)));
 
     mockMvc.perform(get("/api/records").with(registeredUser())).andExpect(status().isOk())
         .andExpect(content().json("""
@@ -339,8 +340,8 @@ class RecordControllerTest {
 
   @Test
   void 記録の一覧_絞り込みとcursorと件数をパラメータから受け取ること() throws Exception {
-    when(service.searchRecordList(USER_ID, 2L, 1L, 2026, LocalDate.of(2026, 10, 20), 9L, 10))
-        .thenReturn(new RecordListPage(List.of(), null));
+    when(service.searchRecordList(USER_ID, 2L, 1L, 2026, null, null, LocalDate.of(2026, 10, 20), 9L,
+        10)).thenReturn(new RecordListPage(List.of(), null));
 
     mockMvc
         .perform(get("/api/records").param("categoryId", "2").param("shopKindId", "1")
@@ -353,18 +354,18 @@ class RecordControllerTest {
 
   @Test
   void 記録の一覧_空の件数は20として検索すること() throws Exception {
-    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, null, null, 20))
         .thenReturn(new RecordListPage(List.of(), null));
 
     mockMvc.perform(get("/api/records").param("limit", "").with(registeredUser()))
         .andExpect(status().isOk());
 
-    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20);
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, null, null, 20);
   }
 
   @Test
   void 記録の一覧_空の絞り込みとcursorは指定なしとして渡すこと() throws Exception {
-    when(service.searchRecordList(USER_ID, null, null, null, null, null, 20))
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, null, null, 20))
         .thenReturn(new RecordListPage(List.of(), null));
 
     mockMvc
@@ -373,14 +374,14 @@ class RecordControllerTest {
                 .param("cursorEatenOn", "").param("cursorId", "").with(registeredUser()))
         .andExpect(status().isOk());
 
-    verify(service).searchRecordList(USER_ID, null, null, null, null, null, 20); // 最初のページとして検索する
+    verify(service).searchRecordList(USER_ID, null, null, null, null, null, null, null, 20); // 最初のページとして検索する
   }
 
   @Test
   void 記録の一覧_cursorの記録IDだけが空の場合は食べた日だけを渡すこと() throws Exception {
     // Service が「cursor の片方だけ」として 400 にする（Service のテストで確かめている）
-    when(service.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 10, 20), null, 20))
-        .thenThrow(
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, LocalDate.of(2026, 10, 20),
+        null, 20)).thenThrow(
             new InvalidSearchConditionException("cursorEatenOn と cursorId は、両方指定するか、両方省略してください。"));
 
     mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026-10-20").param("cursorId", "")
@@ -395,7 +396,8 @@ class RecordControllerTest {
              "message": "リクエストのパラメータが正しくありません。"}
             """));
 
-    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), any(),
+        any(), anyInt());
   }
 
   @Test
@@ -403,7 +405,8 @@ class RecordControllerTest {
     mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026-13-01").param("cursorId", "9")
         .with(registeredUser())).andExpect(status().isBadRequest());
 
-    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), any(),
+        any(), anyInt());
   }
 
   @Test
@@ -411,12 +414,13 @@ class RecordControllerTest {
     mockMvc.perform(get("/api/records").param("cursorEatenOn", "2026/10/20").param("cursorId", "9")
         .with(registeredUser())).andExpect(status().isBadRequest());
 
-    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), anyInt());
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), any(),
+        any(), anyInt());
   }
 
   @Test
   void 記録の一覧_条件の値が範囲の外の場合は400とServiceのメッセージが返ること() throws Exception {
-    when(service.searchRecordList(USER_ID, null, null, null, null, null, 101))
+    when(service.searchRecordList(USER_ID, null, null, null, null, null, null, null, 101))
         .thenThrow(new InvalidSearchConditionException("件数は1〜100で指定してください。"));
 
     mockMvc.perform(get("/api/records").param("limit", "101").with(registeredUser()))
@@ -442,5 +446,61 @@ class RecordControllerTest {
   @Test
   void 記録がある年_JWTが付いていない場合は401が返ること() throws Exception {
     mockMvc.perform(get("/api/records/years")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 記録の一覧_食べた日の範囲をパラメータから受け取ること() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 11, 2),
+        LocalDate.of(2026, 11, 2), null, null, 20)).thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc.perform(get("/api/records").param("eatenFrom", "2026-11-02")
+        .param("eatenTo", "2026-11-02").with(registeredUser())).andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 11, 2),
+        LocalDate.of(2026, 11, 2), null, null, 20);
+  }
+
+  @Test
+  void 記録の一覧_範囲の片側だけと空の範囲は指定なしとして渡すこと() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, null, LocalDate.of(2026, 11, 1), null,
+        null, 20)).thenReturn(new RecordListPage(List.of(), null));
+
+    mockMvc.perform(get("/api/records").param("eatenFrom", "").param("eatenTo", "2026-11-01")
+        .with(registeredUser())).andExpect(status().isOk());
+
+    verify(service).searchRecordList(USER_ID, null, null, null, null, LocalDate.of(2026, 11, 1),
+        null, null, 20);
+  }
+
+  @Test
+  void 記録の一覧_範囲の日付が存在しない日の場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").param("eatenTo", "2026-02-29").with(registeredUser()))
+        .andExpect(status().isBadRequest());
+
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), any(),
+        any(), anyInt());
+  }
+
+  @Test
+  void 記録の一覧_範囲の日付が年月日のハイフン区切りでない場合は400が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").param("eatenFrom", "2026/11/02").with(registeredUser()))
+        .andExpect(status().isBadRequest());
+
+    verify(service, never()).searchRecordList(any(), any(), any(), any(), any(), any(), any(),
+        any(), anyInt());
+  }
+
+  @Test
+  void 記録の一覧_範囲が逆の場合は400とServiceのメッセージが返ること() throws Exception {
+    when(service.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 11, 3),
+        LocalDate.of(2026, 11, 2), null, null, 20)).thenThrow(
+            new InvalidSearchConditionException("eatenFrom は、eatenTo と同じ日か、それより前の日を指定してください。"));
+
+    mockMvc.perform(get("/api/records").param("eatenFrom", "2026-11-03")
+        .param("eatenTo", "2026-11-02").with(registeredUser())).andExpect(status().isBadRequest())
+        .andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST",
+             "message": "eatenFrom は、eatenTo と同じ日か、それより前の日を指定してください。"}
+            """));
   }
 }

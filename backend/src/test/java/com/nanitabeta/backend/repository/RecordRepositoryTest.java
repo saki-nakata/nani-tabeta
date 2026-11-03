@@ -374,4 +374,33 @@ class RecordRepositoryTest {
 
     assertThat(actual).isEmpty();
   }
+
+  @Test
+  @Sql("/sql/insert-records-for-list.sql")
+  void 記録の一覧_同じ日だけの範囲とcursorで同じ日の続きを最後まで重なり抜けなく読めること() {
+    // 2026-10-24 は Saki の記録4・3と、ほかの人の記録6。1件ずつ読む
+    LocalDate day = LocalDate.of(2026, 10, 24);
+
+    List<RecordListCard> first =
+        sut.searchRecordListCards(listQuery().eatenFrom(day).eatenTo(day).limit(1).build());
+    List<RecordListCard> second = sut.searchRecordListCards(
+        listQuery().eatenFrom(day).eatenTo(day).cursorEatenOn(day).cursorId(4L).limit(1).build());
+    List<RecordListCard> third = sut.searchRecordListCards(
+        listQuery().eatenFrom(day).eatenTo(day).cursorEatenOn(day).cursorId(3L).limit(1).build());
+
+    assertThat(first).extracting(RecordListCard::getId).containsExactly(4L);
+    assertThat(second).extracting(RecordListCard::getId).containsExactly(3L);
+    assertThat(third).isEmpty();
+  }
+
+  @Test
+  @Sql("/sql/insert-records-for-list.sql")
+  void 記録の一覧_昨日までの範囲とcursorで前の日の続きを読めること() {
+    // 「2026-10-23 まで」で、記録5から続きを読む → 2・1
+    List<RecordListCard> actual =
+        sut.searchRecordListCards(listQuery().eatenTo(LocalDate.of(2026, 10, 23))
+            .cursorEatenOn(LocalDate.of(2026, 10, 23)).cursorId(5L).build());
+
+    assertThat(actual).extracting(RecordListCard::getId).containsExactly(2L, 1L);
+  }
 }

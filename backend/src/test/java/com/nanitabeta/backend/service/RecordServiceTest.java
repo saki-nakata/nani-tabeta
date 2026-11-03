@@ -347,7 +347,7 @@ class RecordServiceTest {
     RecordListQuery expectedQuery =
         RecordListQuery.builder().userId(USER_ID).categoryId(4L).shopKindId(1L).limit(21).build();
 
-    RecordListPage actual = sut.searchRecordList(USER_ID, 4L, 1L, null, null, null, 20);
+    RecordListPage actual = sut.searchRecordList(USER_ID, 4L, 1L, null, null, null, null, null, 20);
 
     assertThat(actual).isEqualTo(expected);
     assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
@@ -362,7 +362,8 @@ class RecordServiceTest {
         List.of(cardWithPhotos(12L, OCTOBER_24, null, 0), cardWithPhotos(9L, OCTOBER_20, null, 0)),
         new RecordListCursor(OCTOBER_20, 9L));
 
-    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, null, null, null, 2);
+    RecordListPage actual =
+        sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 2);
 
     assertThat(actual).isEqualTo(expected);
     // 確かめるために多く読んだ 1 件（記録 7）の写真は検索しないこと
@@ -375,7 +376,7 @@ class RecordServiceTest {
         .eatenFrom(LocalDate.of(2026, 1, 1)).eatenTo(LocalDate.of(2026, 12, 31))
         .cursorEatenOn(OCTOBER_20).cursorId(9L).limit(21).build();
 
-    sut.searchRecordList(USER_ID, null, null, 2026, OCTOBER_20, 9L, 20);
+    sut.searchRecordList(USER_ID, null, null, 2026, null, null, OCTOBER_20, 9L, 20);
 
     assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
   }
@@ -394,7 +395,8 @@ class RecordServiceTest {
             cardWithPhotos(9L, OCTOBER_20, photo3, 1), cardWithPhotos(7L, OCTOBER_20, null, 0)),
         null);
 
-    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, null, null, null, 20);
+    RecordListPage actual =
+        sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 20);
 
     assertThat(actual).isEqualTo(expected);
   }
@@ -404,7 +406,8 @@ class RecordServiceTest {
     when(repository.searchRecordListCards(any())).thenReturn(List.of());
     RecordListPage expected = new RecordListPage(List.of(), null);
 
-    RecordListPage actual = sut.searchRecordList(USER_ID, 999L, null, null, null, null, 20);
+    RecordListPage actual =
+        sut.searchRecordList(USER_ID, 999L, null, null, null, null, null, null, 20);
 
     assertThat(actual).isEqualTo(expected);
     verify(repository, never()).searchRecordPhotosByRecordIdList(any());
@@ -412,7 +415,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_分類IDが0の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, 0L, null, null, null, null, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, 0L, null, null, null, null, null, null, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("分類IDは1以上で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -420,7 +424,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_業態IDが負の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, -1L, null, null, null, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, -1L, null, null, null, null, null, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("業態IDは1以上で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -428,7 +433,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_年が1000より前の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, 999, null, null, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, 999, null, null, null, null, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("年は1000〜9999で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -436,7 +442,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_年が9999より後の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, 10000, null, null, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, 10000, null, null, null, null, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("年は1000〜9999で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -444,8 +451,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_年が1000と9999の場合は検索できること() {
-    sut.searchRecordList(USER_ID, null, null, 1000, null, null, 20);
-    sut.searchRecordList(USER_ID, null, null, 9999, null, null, 20);
+    sut.searchRecordList(USER_ID, null, null, 1000, null, null, null, null, 20);
+    sut.searchRecordList(USER_ID, null, null, 9999, null, null, null, null, 20);
 
     verify(repository).searchRecordListCards(
         argThat(query -> LocalDate.of(1000, 1, 1).equals(query.getEatenFrom())));
@@ -455,7 +462,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_cursorの食べた日だけ指定された場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, OCTOBER_20, null, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, null, null, null, OCTOBER_20, null, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage(CONDITION_MESSAGE_CURSOR);
 
     verify(repository, never()).searchRecordListCards(any());
@@ -463,7 +471,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_cursorの記録IDだけ指定された場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, 9L, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, null, null, null, null, 9L, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage(CONDITION_MESSAGE_CURSOR);
 
     verify(repository, never()).searchRecordListCards(any());
@@ -471,7 +480,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_cursorの記録IDが0の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, OCTOBER_20, 0L, 20))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, null, null, null, OCTOBER_20, 0L, 20))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("cursorIdは1以上で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -479,7 +489,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_件数が0の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, null, 0))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 0))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("件数は1〜100で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -487,7 +498,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_件数が101の場合は例外を投げて検索しないこと() {
-    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null, null, 101))
+    assertThatThrownBy(
+        () -> sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 101))
         .isInstanceOf(InvalidSearchConditionException.class).hasMessage("件数は1〜100で指定してください。");
 
     verify(repository, never()).searchRecordListCards(any());
@@ -495,8 +507,8 @@ class RecordServiceTest {
 
   @Test
   void 記録の一覧_件数が1と100の場合は1件多く読むこと() {
-    sut.searchRecordList(USER_ID, null, null, null, null, null, 1);
-    sut.searchRecordList(USER_ID, null, null, null, null, null, 100);
+    sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 1);
+    sut.searchRecordList(USER_ID, null, null, null, null, null, null, null, 100);
 
     verify(repository).searchRecordListCards(argThat(query -> query.getLimit() == 2));
     verify(repository).searchRecordListCards(argThat(query -> query.getLimit() == 101));
@@ -509,5 +521,158 @@ class RecordServiceTest {
     List<Integer> actual = sut.searchRecordYears(USER_ID);
 
     assertThat(actual).containsExactly(2026, 2025);
+  }
+
+  @Test
+  void 記録の一覧_食べた日の範囲だけを指定した場合はそのまま渡すこと() {
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 11, 2)).eatenTo(LocalDate.of(2026, 11, 2)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 11, 2),
+        LocalDate.of(2026, 11, 2), null, null, 20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_範囲の片側だけを指定した場合はもう片側を制限しないこと() {
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenTo(LocalDate.of(2026, 11, 1)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, null, null, LocalDate.of(2026, 11, 1), null, null,
+        20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_範囲の最初の日だけを指定した場合は最後の日を制限しないこと() {
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 10, 1)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, null, LocalDate.of(2026, 10, 1), null, null, null,
+        20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_年と範囲が1日だけ重なる場合はその1日を検索すること() {
+    // 2026年と「2026/1/1 まで」の重なり → 1/1〜1/1（最初の日と最後の日が同じでも、空にしない）
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 1, 1)).eatenTo(LocalDate.of(2026, 1, 1)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, 2026, null, LocalDate.of(2026, 1, 1), null, null, 20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_範囲が年より前で重ならない場合は検索せずに空の一覧を返すこと() {
+    // 2026年と「2025/12/31 まで」は重ならない
+    RecordListPage expected = new RecordListPage(List.of(), null);
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, 2026, null,
+        LocalDate.of(2025, 12, 31), null, null, 20);
+
+    assertThat(actual).isEqualTo(expected);
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_年と範囲の最後の日を重ねた場合は最後の日を早い方にすること() {
+    // 2026年（1/1〜12/31）と「11/1 まで」の重なり → 1/1〜11/1
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 1, 1)).eatenTo(LocalDate.of(2026, 11, 1)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, 2026, null, LocalDate.of(2026, 11, 1), null, null,
+        20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_年と範囲の最初の日を重ねた場合は最初の日を遅い方にすること() {
+    // 2026年（1/1〜12/31）と「10/1 から」の重なり → 10/1〜12/31
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2026, 10, 1)).eatenTo(LocalDate.of(2026, 12, 31)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, 2026, LocalDate.of(2026, 10, 1), null, null, null,
+        20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_範囲が年をまるごと含む場合は年の範囲にすること() {
+    // 2025年と「2026/11/1 まで」の重なり → 2025/1/1〜2025/12/31
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(2025, 1, 1)).eatenTo(LocalDate.of(2025, 12, 31)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, 2025, null, LocalDate.of(2026, 11, 1), null, null,
+        20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_年と範囲が重ならない場合は検索せずに空の一覧を返すこと() {
+    // 2025年と「今日（2026/11/2）だけ」は重ならない（どちらも正しい入力なので 400 ではない）
+    RecordListPage expected = new RecordListPage(List.of(), null);
+
+    RecordListPage actual = sut.searchRecordList(USER_ID, null, null, 2025,
+        LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 2), null, null, 20);
+
+    assertThat(actual).isEqualTo(expected);
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_範囲が逆の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null,
+        LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 2), null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class)
+        .hasMessage("eatenFrom は、eatenTo と同じ日か、それより前の日を指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_範囲の日付の年が1000より前の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null,
+        LocalDate.of(999, 12, 31), null, null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class)
+        .hasMessage("eatenFromは1000〜9999年の日付で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_範囲の日付の年が9999より後の場合は例外を投げて検索しないこと() {
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, null, null,
+        LocalDate.of(10000, 1, 1), null, null, 20))
+        .isInstanceOf(InvalidSearchConditionException.class)
+        .hasMessage("eatenToは1000〜9999年の日付で指定してください。");
+
+    verify(repository, never()).searchRecordListCards(any());
+  }
+
+  @Test
+  void 記録の一覧_範囲の日付の年が1000と9999の場合は検索できること() {
+    RecordListQuery expectedQuery = RecordListQuery.builder().userId(USER_ID)
+        .eatenFrom(LocalDate.of(1000, 1, 1)).eatenTo(LocalDate.of(9999, 12, 31)).limit(21).build();
+
+    sut.searchRecordList(USER_ID, null, null, null, LocalDate.of(1000, 1, 1),
+        LocalDate.of(9999, 12, 31), null, null, 20);
+
+    assertThat(capturedQuery()).usingRecursiveComparison().isEqualTo(expectedQuery);
+  }
+
+  @Test
+  void 記録の一覧_年と範囲が重ならない場合でも件数が正しくなければ例外を投げること() {
+    // 空を返す前に、すべての値を確かめること
+    assertThatThrownBy(() -> sut.searchRecordList(USER_ID, null, null, 2025,
+        LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 2), null, null, 101))
+        .isInstanceOf(InvalidSearchConditionException.class).hasMessage("件数は1〜100で指定してください。");
   }
 }
