@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,7 +18,9 @@ import com.nanitabeta.backend.exception.DuplicateItemNameException;
 import com.nanitabeta.backend.exception.InvalidCategoryException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ItemRepository;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +39,9 @@ class ItemServiceTest {
 
   @Mock
   private CategoryService categoryService;
+
+  @Mock
+  private NameReadingService nameReadingService;
 
   @InjectMocks
   private ItemService sut;
@@ -120,6 +126,183 @@ class ItemServiceTest {
     sut.searchItemSuggestions(1L, " 　 ");
 
     verify(repository).searchItemSuggestions(eq(1L), eq(""), eq(""), anyInt());
+  }
+
+  @Test
+  void 商品の候補_商品名で10件見つかった場合は読みでは探さないこと() {
+    List<Item> expected = createItems(1L, 10);
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllItemSuggestions(any());
+    verify(nameReadingService, never()).matchesReading(any(), any());
+  }
+
+  @Test
+  void 商品の候補_キーワードが未指定の場合は読みでは探さないこと() {
+    sut.searchItemSuggestions(1L, null);
+
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllItemSuggestions(any());
+  }
+
+  @Test
+  void 商品の候補_比べる形がない場合は全部を読み出さないこと() {
+    List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
+    when(nameReadingService.createKeywordForms(" 　 ")).thenReturn(List.of());
+
+    List<Item> actual = sut.searchItemSuggestions(1L, " 　 ");
+
+    assertThat(actual).isEqualTo(expected);
+    verify(repository, never()).searchAllItemSuggestions(any());
+    verify(nameReadingService, never()).matchesReading(any(), any());
+  }
+
+  @Test
+  void 商品の候補_比べる形はエスケープも正規化もしていない入力から作ること() {
+    when(nameReadingService.createKeywordForms(any())).thenReturn(List.of());
+
+    sut.searchItemSuggestions(1L, "　100%_\\OFF　");
+
+    verify(nameReadingService).createKeywordForms("　100%_\\OFF　");
+  }
+
+  @Test
+  void 商品の候補_商品名で見つからない場合は読みが当たる商品を商品名順に返すこと() {
+    Item hojichaLatte = new Item(3L, 1L, "ほうじ茶ラテ", 2L, false);
+    Item coffee = new Item(4L, 1L, "コーヒー", 2L, false);
+    Item matchaLatte = new Item(5L, 1L, "抹茶ラテ", 2L, false);
+    List<String> keywordForms = List.of("ラテ");
+    when(nameReadingService.createKeywordForms("らて")).thenReturn(keywordForms);
+    when(repository.searchAllItemSuggestions(1L))
+        .thenReturn(List.of(hojichaLatte, coffee, matchaLatte));
+    stubMatchingNames(Set.of("ほうじ茶ラテ", "抹茶ラテ"));
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "らて");
+
+    List<Item> expected = List.of(hojichaLatte, matchaLatte);
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService).matchesReading("コーヒー", keywordForms);
+    // 比べる形づくりと全部の読み出しは、1 回の検索で 1 回だけ
+    verify(nameReadingService, times(1)).createKeywordForms(any());
+    verify(repository, times(1)).searchAllItemSuggestions(any());
+  }
+
+  @Test
+  void 商品の候補_読みで当たる商品がない場合は商品名の候補をそのまま返すこと() {
+    Item latte = new Item(6L, 1L, "ラテ", 2L, false);
+    Item matchaLatte = new Item(5L, 1L, "抹茶ラテ", 2L, false);
+    Item coffee = new Item(4L, 1L, "コーヒー", 2L, false);
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(latte, matchaLatte));
+    when(nameReadingService.createKeywordForms("ラテ")).thenReturn(List.of("ラテ"));
+    when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(coffee));
+    stubMatchingNames(Set.of()); // どの名前も読みで当たらない
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+
+    List<Item> expected = List.of(latte, matchaLatte);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 商品の候補_商品名の候補を先に元の順で並べ読みの候補をうしろに足すこと() {
+    Item matchaLatte = new Item(5L, 1L, "抹茶ラテ", 2L, false);
+    Item latte = new Item(6L, 1L, "ラテ", 2L, false);
+    Item hojichaLatte = new Item(3L, 1L, "ほうじ茶ラテ", 2L, false);
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(latte, matchaLatte)); // LOWER 一致の「ラテ」が先頭
+    when(nameReadingService.createKeywordForms("ラテ")).thenReturn(List.of("ラテ"));
+    when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(hojichaLatte));
+    stubMatchingNames(Set.of("ほうじ茶ラテ"));
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+
+    List<Item> expected = List.of(latte, matchaLatte, hojichaLatte);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 商品の候補_商品名で見つかった商品はIDで見分けて読みの候補に重ねて足さないこと() {
+    Item latte = new Item(6L, 1L, "ラテ", 2L, false);
+    // 全部を読み出した結果の中の同じ商品。2 回の SELECT の間に名前や分類が変わっても、ID が同じなら同じ商品とみなす
+    Item sameIdLatte = new Item(6L, 1L, "らて", 3L, true);
+    Item matchaLatte = new Item(5L, 1L, "抹茶ラテ", 2L, false);
+    List<String> keywordForms = List.of("ラテ");
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(latte));
+    when(nameReadingService.createKeywordForms("ラテ")).thenReturn(keywordForms);
+    when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(matchaLatte, sameIdLatte));
+    stubMatchingNames(Set.of("ラテ", "らて", "抹茶ラテ"));
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+
+    List<Item> expected = List.of(latte, matchaLatte);
+    assertThat(actual).isEqualTo(expected);
+    // すでに候補にある商品は、読みも作らない
+    verify(nameReadingService, times(1)).matchesReading(any(), any());
+    verify(nameReadingService).matchesReading("抹茶ラテ", keywordForms);
+  }
+
+  @Test
+  void 商品の候補_商品名で9件見つかった場合は読みの候補を1件だけ足しそれ以上は読みを作らないこと() {
+    List<Item> nameMatches = createItems(1L, 9); // ID 1〜9
+    List<Item> readingMatches = createItems(101L, 3); // ID 101〜103
+    when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(nameMatches);
+    when(nameReadingService.createKeywordForms("まっちゃ")).thenReturn(List.of("マッチャ"));
+    when(repository.searchAllItemSuggestions(1L)).thenReturn(readingMatches);
+    when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+
+    List<Item> expected = new ArrayList<>(nameMatches);
+    expected.add(readingMatches.get(0));
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, times(1)).matchesReading(any(), any());
+  }
+
+  @Test
+  void 商品の候補_商品名で見つからない場合は読みの候補を10件まで返すこと() {
+    List<Item> readingMatches = createItems(101L, 12); // ID 101〜112
+    when(nameReadingService.createKeywordForms("まっちゃ")).thenReturn(List.of("マッチャ"));
+    when(repository.searchAllItemSuggestions(1L)).thenReturn(readingMatches);
+    when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
+
+    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+
+    List<Item> expected = readingMatches.subList(0, 10);
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, times(10)).matchesReading(any(), any());
+  }
+
+  /**
+   * テスト用の商品を、ID が続いた番号で作ります。
+   *
+   * @param firstId 最初の ID
+   * @param count 件数
+   * @return 商品の一覧（商品名は「商品{ID}」）
+   */
+  private List<Item> createItems(Long firstId, int count) {
+    List<Item> items = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      long id = firstId + i;
+      items.add(new Item(id, 1L, "商品" + id, 2L, false));
+    }
+    return items;
+  }
+
+  /**
+   * 読みが当たる商品名を決めます（それ以外の商品名は当たらない）。
+   *
+   * @param matchingNames 読みが当たる商品名
+   */
+  private void stubMatchingNames(Set<String> matchingNames) {
+    when(nameReadingService.matchesReading(any(), any()))
+        .thenAnswer(invocation -> matchingNames.contains(invocation.getArgument(0)));
   }
 
   @Test

@@ -141,6 +141,7 @@ export function ShopPicker({
       {canUseNewShop && (
         <NewShopForm
           shopName={shopName}
+          hasSuggestions={result !== null && result.shops.length > 0}
           shopKinds={shopKinds}
           shopKindId={newShopKindId}
           onShopKindChange={setNewShopKindId}

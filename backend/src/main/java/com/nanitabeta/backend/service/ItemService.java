@@ -6,7 +6,10 @@ import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ItemRepository;
 import com.nanitabeta.backend.util.LikeEscaper;
 import com.nanitabeta.backend.util.NameNormalizer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -24,13 +27,15 @@ public class ItemService {
   private ItemRepository repository;
   private ShopService shopService;
   private CategoryService categoryService;
+  private NameReadingService nameReadingService;
 
   @Autowired
   public ItemService(ItemRepository repository, ShopService shopService,
-      CategoryService categoryService) {
+      CategoryService categoryService, NameReadingService nameReadingService) {
     this.repository = repository;
     this.shopService = shopService;
     this.categoryService = categoryService;
+    this.nameReadingService = nameReadingService;
   }
 
   /**
@@ -50,6 +55,9 @@ public class ItemService {
 
   /**
    * 指定した店の商品を、入力補助の候補として取得します。
+   * <p>
+   * まず商品名で探します（キーワードを含む商品。LOWER 一致の商品名を先頭に、残りは商品名順）。 件数の上限に足りない場合は、読みがキーワードに当たる商品を、商品名順にうしろへ足します
+   * （「まっちゃ」で「抹茶ラテ」、「latte」で「ラテ」を見つけるため）。 商品名で上限まで見つかった場合は、読みでは探しません。
    *
    * @param shopId 店ID
    * @param keyword 商品名の一部（null または空文字の場合は絞り込まない）
@@ -65,7 +73,37 @@ public class ItemService {
       sameKeyword = NameNormalizer.normalize(keyword);
       likeKeyword = LikeEscaper.escape(sameKeyword);
     }
-    return repository.searchItemSuggestions(shopId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
+    List<Item> suggestions =
+        repository.searchItemSuggestions(shopId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
+
+    // 商品名で上限まで見つかった、またはキーワードがない場合は、読みでは探さない
+    if (keyword == null || suggestions.size() >= SUGGESTION_LIMIT) {
+      return suggestions;
+    }
+    // 読みと比べる形は、LIKE のエスケープ前のキーワードから作る（% や _ を普通の文字として比べるため）
+    List<String> keywordForms = nameReadingService.createKeywordForms(keyword);
+    if (keywordForms.isEmpty()) {
+      return suggestions;
+    }
+
+    List<Item> results = new ArrayList<>(suggestions);
+    // すでに候補にある商品は、ID で見分けて足さない
+    Set<Long> foundIds = new HashSet<>();
+    for (Item item : suggestions) {
+      foundIds.add(item.getId());
+    }
+    // その店の候補になりうる商品を商品名順に見て、読みが当たるものを足す（上限になったら止める）
+    List<Item> allItems = repository.searchAllItemSuggestions(shopId);
+    for (Item item : allItems) {
+      if (results.size() >= SUGGESTION_LIMIT) {
+        break;
+      }
+      if (!foundIds.contains(item.getId())
+          && nameReadingService.matchesReading(item.getItemName(), keywordForms)) {
+        results.add(item);
+      }
+    }
+    return results;
   }
 
   /**

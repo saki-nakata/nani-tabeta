@@ -8,7 +8,10 @@ import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
 import com.nanitabeta.backend.util.LikeEscaper;
 import com.nanitabeta.backend.util.NameNormalizer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,13 +29,15 @@ public class ShopService {
   private ShopRepository repository;
   private AreaService areaService;
   private ShopKindService shopKindService;
+  private NameReadingService nameReadingService;
 
   @Autowired
   public ShopService(ShopRepository repository, AreaService areaService,
-      ShopKindService shopKindService) {
+      ShopKindService shopKindService, NameReadingService nameReadingService) {
     this.repository = repository;
     this.areaService = areaService;
     this.shopKindService = shopKindService;
+    this.nameReadingService = nameReadingService;
   }
 
   /**
@@ -126,7 +131,9 @@ public class ShopService {
   /**
    * 店の登録時に表示する候補を取得します。
    * <p>
-   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
+   * 閉店した店は候補に出しません。まず店名で探します（キーワードを含む店。LOWER 一致の店名を先頭に、残りは店名順）。
+   * 件数の上限に足りない場合は、読みがキーワードに当たる店を、店名順にうしろへ足します （「まつや」で「松屋」、「starbucks」で「スターバックス」を見つけるため）。
+   * 店名で上限まで見つかった場合は、読みでは探しません。
    *
    * @param areaId エリアID
    * @param keyword 店名の一部（null または空文字の場合は絞り込まない）
@@ -140,6 +147,37 @@ public class ShopService {
       sameKeyword = NameNormalizer.normalize(keyword);
       likeKeyword = LikeEscaper.escape(sameKeyword);
     }
-    return repository.searchShopSuggestions(areaId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
+    List<Shop> suggestions =
+        repository.searchShopSuggestions(areaId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
+
+    // 店名で上限まで見つかった、またはキーワードがない場合は、読みでは探さない
+    if (keyword == null || suggestions.size() >= SUGGESTION_LIMIT) {
+      return suggestions;
+    }
+    // 読みと比べる形は、LIKE のエスケープ前のキーワードから作る（% や _ を普通の文字として比べるため）
+    List<String> keywordForms = nameReadingService.createKeywordForms(keyword);
+    if (keywordForms.isEmpty()) {
+      return suggestions;
+    }
+
+    List<Shop> results = new ArrayList<>(suggestions);
+    // すでに候補にある店は、ID で見分けて足さない
+    Set<Long> foundIds = new HashSet<>();
+    for (Shop shop : suggestions) {
+      foundIds.add(shop.getId());
+    }
+    // そのエリアの閉店していない店を店名順に見て、読みが当たるものを足す（上限になったら止める）
+    List<Shop> allShops = repository.searchAllShopSuggestions(areaId);
+    for (Shop shop : allShops) {
+      if (results.size() >= SUGGESTION_LIMIT) {
+        break;
+      }
+      if (!foundIds.contains(shop.getId())
+          && nameReadingService.matchesReading(shop.getShopName(), keywordForms)) {
+        results.add(shop);
+      }
+    }
+    return results;
   }
+
 }

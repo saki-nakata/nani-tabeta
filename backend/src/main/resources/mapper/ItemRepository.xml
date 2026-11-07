@@ -31,6 +31,15 @@
     LIMIT #{limit}
   </select>
 
+  <!-- 店の商品の候補になりうるものすべて（読みでの候補検索に使う。条件は上の候補と同じで、キーワードと件数では絞らない。記録が複数あっても 1 行になるよう EXISTS で確かめる） -->
+  <select id="searchAllItemSuggestions" resultType="com.nanitabeta.backend.data.Item">
+    SELECT id, shop_id, item_name, category_id, is_seasonal
+    FROM items
+    WHERE shop_id = #{shopId}
+      AND EXISTS (SELECT 1 FROM records WHERE records.item_id = items.id)
+    ORDER BY item_name, id
+  </select>
+
   <!-- 店と商品名で商品を取得（商品名は LOWER 一致。大文字小文字だけが違う商品も同じ商品とする） -->
   <select id="searchItemByShopAndName" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal

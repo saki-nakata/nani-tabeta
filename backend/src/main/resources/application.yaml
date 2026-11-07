@@ -28,3 +28,8 @@ mybatis:
   mapper-locations: classpath*:/mapper/*.xml     # XML
   configuration:
     map-underscore-to-camel-case: true
+
+# 店名・商品名の読みを作る Sudachi の辞書（build.gradle の prepareSudachiDictionary が用意する）
+# 場所は backend のフォルダから。公開先では、そこに置いた辞書の場所に変える
+sudachi:
+  dictionary-path: build/sudachi/sudachi-dictionary-20261015/system_core.dic

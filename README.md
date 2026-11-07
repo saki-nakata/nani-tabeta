@@ -33,6 +33,7 @@
 | データベース | MySQL 8.4（Docker Compose）|
 | 認証 | Supabase Auth（Google OAuth）。サーバー側は Spring Security で JWT を検証 |
 | ファイル保存 | Supabase Storage（記録の写真） |
+| 読みの取得 | Sudachi 0.8.2＋SudachiDict core（ひらがなで漢字の店名・商品名を探す） |
 | テスト | Vitest（フロントエンド）/ JUnit・Spring Boot Test（バックエンド） |
 | 整形 | Prettier（フロントエンド）/ Spotless（バックエンド） |
 
@@ -145,6 +146,10 @@ cd backend
 .\gradlew test        # テスト用DB（nani_tabeta_test）で実行する
 .\gradlew bootRun     # http://localhost:8080
 ```
+
+**初めての `test`・`bootRun` では、読みの辞書（約 77MB）をダウンロードします。**
+店名・商品名の読みを作る Sudachi の辞書です。Git には入れず、`backend/build/sudachi/` に置かれます。
+2 回目からはダウンロードしません（詳しくは [技術選定](docs/技術選定.md) の「読みの取得（Sudachi）」）。
 
 **テーブルの作成は不要です。** 起動時に Flyway が
 `backend/src/main/resources/db/migration/` の SQL を自動で適用し、

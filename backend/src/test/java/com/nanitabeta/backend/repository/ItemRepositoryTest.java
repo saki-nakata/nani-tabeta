@@ -71,6 +71,42 @@ class ItemRepositoryTest {
 
   @Test
   @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 候補になりうる商品_店の記録がある商品だけを商品名順に取得できること() {
+    // 店 1 の商品は からあげ棒（記録あり）・おにぎり 鮭（記録あり）・からあげ串（記録なし）。店 2 の からあげ棒 は入らない
+    List<Item> actual = sut.searchAllItemSuggestions(1L);
+
+    assertThat(actual).extracting(Item::getId).containsExactly(2L, 1L);
+    assertThat(actual).extracting(Item::getItemName).containsExactly("おにぎり 鮭", "からあげ棒");
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 候補になりうる商品_今の候補と同じ列を返すこと() {
+    List<Item> actual = sut.searchAllItemSuggestions(1L);
+
+    Item expected = sut.searchItemSuggestions(1L, null, null, 10).get(0);
+    assertThat(actual.get(0)).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql",
+      "/sql/insert-item-records-twice.sql"})
+  void 候補になりうる商品_記録が複数ある商品も1件だけ返すこと() {
+    List<Item> actual = sut.searchAllItemSuggestions(1L);
+
+    assertThat(actual).extracting(Item::getId).containsExactly(2L, 1L);
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
+  void 候補になりうる商品_商品が登録されていない店の場合は空のリストを返すこと() {
+    List<Item> actual = sut.searchAllItemSuggestions(3L);
+
+    assertThat(actual).isEmpty();
+  }
+
+  @Test
+  @Sql({"/sql/insert-items.sql", "/sql/insert-item-records.sql"})
   void 商品の候補_該当がない場合は空のリストを返すこと() {
     List<Item> actual = sut.searchItemSuggestions(1L, "ラーメン", "ラーメン", 10);
 
