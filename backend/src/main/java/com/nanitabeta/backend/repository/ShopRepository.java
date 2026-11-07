@@ -80,4 +80,15 @@ public interface ShopRepository {
   List<Shop> searchShopSuggestions(@Param("areaId") Long areaId,
       @Param("likeKeyword") String likeKeyword, @Param("sameKeyword") String sameKeyword,
       @Param("limit") int limit);
+
+  /**
+   * エリア内の、候補になりうる店をすべて取得します（読みでの候補検索に使う）。
+   * <p>
+   * 条件は {@link #searchShopSuggestions} と同じ（そのエリアの、閉店していない店）ですが、キーワードでは絞らず、件数の上限もありません。
+   * 読みで一致するかは、名前から読みを作るまでわからないためです。 並びは店名順（同じ店名は店ID順）です。
+   *
+   * @param areaId エリアID
+   * @return 店の一覧（該当がない場合は空のリスト）
+   */
+  List<Shop> searchAllShopSuggestions(Long areaId);
 }

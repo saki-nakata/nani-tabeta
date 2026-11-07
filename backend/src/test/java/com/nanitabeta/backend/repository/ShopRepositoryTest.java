@@ -377,4 +377,31 @@ class ShopRepositoryTest {
 
     assertThat(actual).extracting(Shop::getShopName).containsExactly("100%_OFF", "100XYOFF");
   }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 候補になりうる店_エリア内の閉店していない店だけを店名順に取得できること() {
+    // エリア 20 は スターバックス・セブンイレブン・コメダ珈琲店（閉店）。エリア 13 の セブンイレブン は入らない
+    List<Shop> actual = sut.searchAllShopSuggestions(20L);
+
+    assertThat(actual).extracting(Shop::getId).containsExactly(1L, 2L);
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("スターバックス", "セブンイレブン");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 候補になりうる店_今の候補と同じ列を返すこと() {
+    List<Shop> actual = sut.searchAllShopSuggestions(20L);
+
+    List<Shop> expected = sut.searchShopSuggestions(20L, null, null, 10);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-suggestions.sql")
+  void 候補になりうる店_店がないエリアの場合は空のリストを返すこと() {
+    List<Shop> actual = sut.searchAllShopSuggestions(99L);
+
+    assertThat(actual).isEmpty();
+  }
 }

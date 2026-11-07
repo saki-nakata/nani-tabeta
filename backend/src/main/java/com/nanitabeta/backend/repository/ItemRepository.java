@@ -40,6 +40,17 @@ public interface ItemRepository {
       @Param("limit") int limit);
 
   /**
+   * 指定した店の、候補になりうる商品をすべて取得します（読みでの候補検索に使う）。
+   * <p>
+   * 条件は {@link #searchItemSuggestions} と同じ（その店の商品で、記録があるもの）ですが、キーワードでは絞らず、件数の上限もありません。
+   * 読みで一致するかは、名前から読みを作るまでわからないためです。 並びは商品名順（同じ商品名は商品ID順）です。
+   *
+   * @param shopId 店ID
+   * @return 商品の一覧（該当がない場合は空のリスト）
+   */
+  List<Item> searchAllItemSuggestions(Long shopId);
+
+  /**
    * 店と商品名が一致する商品を取得します。
    * <p>
    * 引数の商品のうち、店ID（shopId）と商品名（itemName）だけを使います。

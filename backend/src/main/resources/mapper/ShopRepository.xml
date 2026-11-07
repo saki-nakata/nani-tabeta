@@ -62,4 +62,13 @@
       shop_name
     LIMIT #{limit}
   </select>
+
+  <!-- エリア内の店の候補になりうるものすべて（読みでの候補検索に使う。閉店を除く。条件は上の候補と同じで、キーワードと件数では絞らない） -->
+  <select id="searchAllShopSuggestions" resultType="com.nanitabeta.backend.data.Shop">
+    SELECT id, shop_name, area_id, shop_kind_id, is_closed
+    FROM shops
+    WHERE area_id = #{areaId}
+      AND is_closed = FALSE
+    ORDER BY shop_name, id
+  </select>
 </mapper>

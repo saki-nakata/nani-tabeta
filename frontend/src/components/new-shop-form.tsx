@@ -5,6 +5,8 @@ import type { ShopKind } from "@/types/master";
 
 type NewShopFormProps = {
   shopName: string;
+  // 候補が 1 件以上出ているか（出ているときは「見つかりませんでした」ではなく「上の候補にない」と案内する）
+  hasSuggestions: boolean;
   shopKinds: ShopKind[];
   shopKindId: number | null;
   onShopKindChange: (shopKindId: number | null) => void;
@@ -13,6 +15,7 @@ type NewShopFormProps = {
 
 export function NewShopForm({
   shopName,
+  hasSuggestions,
   shopKinds,
   shopKindId,
   onShopKindChange,
@@ -20,10 +23,21 @@ export function NewShopForm({
 }: NewShopFormProps) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
-      <p>「{shopName}」は見つかりませんでした。</p>
-      <p className="text-muted-foreground">
-        業態を選ぶと、新しい店として使えます（記録するときに登録します）。
-      </p>
+      {hasSuggestions ? (
+        <>
+          <p>上の候補にない店を使う場合は、業態を選んでください。</p>
+          <p className="text-muted-foreground">
+            新しい店として使えます（記録するときに登録します）。
+          </p>
+        </>
+      ) : (
+        <>
+          <p>「{shopName}」は見つかりませんでした。</p>
+          <p className="text-muted-foreground">
+            業態を選ぶと、新しい店として使えます（記録するときに登録します）。
+          </p>
+        </>
+      )}
       <p className="text-muted-foreground">
         支店名は外して入力してください。（例：セブンイレブン 大阪駅前店 →
         セブンイレブン）

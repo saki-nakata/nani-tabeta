@@ -21,7 +21,9 @@ import com.nanitabeta.backend.exception.InvalidShopException;
 import com.nanitabeta.backend.exception.InvalidShopKindException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.ShopRepository;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +42,9 @@ class ShopServiceTest {
 
   @Mock
   private ShopKindService shopKindService;
+
+  @Mock
+  private NameReadingService nameReadingService;
 
   @InjectMocks
   private ShopService sut;
@@ -229,6 +234,183 @@ class ShopServiceTest {
     sut.searchShopSuggestions(20L, " 　 ");
 
     verify(repository).searchShopSuggestions(eq(20L), eq(""), eq(""), anyInt());
+  }
+
+  @Test
+  void 店の候補_店名で10件見つかった場合は読みでは探さないこと() {
+    List<Shop> expected = createShops(1L, 10);
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllShopSuggestions(any());
+    verify(nameReadingService, never()).matchesReading(any(), any());
+  }
+
+  @Test
+  void 店の候補_キーワードが未指定の場合は読みでは探さないこと() {
+    sut.searchShopSuggestions(20L, null);
+
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllShopSuggestions(any());
+  }
+
+  @Test
+  void 店の候補_比べる形がない場合は全部を読み出さないこと() {
+    List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
+    when(nameReadingService.createKeywordForms(" 　 ")).thenReturn(List.of());
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, " 　 ");
+
+    assertThat(actual).isEqualTo(expected);
+    verify(repository, never()).searchAllShopSuggestions(any());
+    verify(nameReadingService, never()).matchesReading(any(), any());
+  }
+
+  @Test
+  void 店の候補_比べる形はエスケープも正規化もしていない入力から作ること() {
+    when(nameReadingService.createKeywordForms(any())).thenReturn(List.of());
+
+    sut.searchShopSuggestions(20L, "　100%_\\OFF　");
+
+    verify(nameReadingService).createKeywordForms("　100%_\\OFF　");
+  }
+
+  @Test
+  void 店の候補_店名で見つからない場合は読みが当たる店を店名順に返すこと() {
+    Shop starbucks = new Shop(1L, "スターバックス", 20L, 9L, false);
+    Shop matsuya = new Shop(3L, "松屋", 20L, 2L, false);
+    Shop matsuyaCafe = new Shop(4L, "松屋珈琲", 20L, 9L, false);
+    List<String> keywordForms = List.of("マツヤ");
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(keywordForms);
+    when(repository.searchAllShopSuggestions(20L))
+        .thenReturn(List.of(starbucks, matsuya, matsuyaCafe));
+    stubMatchingNames(Set.of("松屋", "松屋珈琲"));
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = List.of(matsuya, matsuyaCafe);
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService).matchesReading("スターバックス", keywordForms);
+    // 比べる形づくりと全部の読み出しは、1 回の検索で 1 回だけ
+    verify(nameReadingService, times(1)).createKeywordForms(any());
+    verify(repository, times(1)).searchAllShopSuggestions(any());
+  }
+
+  @Test
+  void 店の候補_読みで当たる店がない場合は店名の候補をそのまま返すこと() {
+    Shop matsuyaKana = new Shop(5L, "まつや", 20L, 2L, false);
+    Shop matsuyaStore = new Shop(6L, "まつやストア", 20L, 1L, false);
+    Shop starbucks = new Shop(1L, "スターバックス", 20L, 9L, false);
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(matsuyaKana, matsuyaStore));
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(List.of("マツヤ"));
+    when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(starbucks));
+    stubMatchingNames(Set.of()); // どの店名も読みで当たらない
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = List.of(matsuyaKana, matsuyaStore);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 店の候補_店名の候補を先に元の順で並べ読みの候補をうしろに足すこと() {
+    Shop matsuyaKana = new Shop(5L, "まつや", 20L, 2L, false);
+    Shop matsuyaStore = new Shop(6L, "まつやストア", 20L, 1L, false);
+    Shop matsuya = new Shop(3L, "松屋", 20L, 2L, false);
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(matsuyaKana, matsuyaStore)); // 完全一致の「まつや」が先頭
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(List.of("マツヤ"));
+    when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(matsuya));
+    stubMatchingNames(Set.of("松屋"));
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = List.of(matsuyaKana, matsuyaStore, matsuya);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 店の候補_店名で見つかった店はIDで見分けて読みの候補に重ねて足さないこと() {
+    Shop matsuyaKana = new Shop(5L, "まつや", 20L, 2L, false);
+    // 全部を読み出した結果の中の同じ店。2 回の SELECT の間に店名や業態が変わっても、ID が同じなら同じ店とみなす
+    Shop sameIdMatsuyaKana = new Shop(5L, "マツヤ", 20L, 3L, false);
+    Shop matsuya = new Shop(3L, "松屋", 20L, 2L, false);
+    List<String> keywordForms = List.of("マツヤ");
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt()))
+        .thenReturn(List.of(matsuyaKana));
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(keywordForms);
+    when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(sameIdMatsuyaKana, matsuya));
+    stubMatchingNames(Set.of("まつや", "マツヤ", "松屋"));
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = List.of(matsuyaKana, matsuya);
+    assertThat(actual).isEqualTo(expected);
+    // すでに候補にある店は、読みも作らない
+    verify(nameReadingService, times(1)).matchesReading(any(), any());
+    verify(nameReadingService).matchesReading("松屋", keywordForms);
+  }
+
+  @Test
+  void 店の候補_店名で9件見つかった場合は読みの候補を1件だけ足しそれ以上は読みを作らないこと() {
+    List<Shop> nameMatches = createShops(1L, 9); // ID 1〜9
+    List<Shop> readingMatches = createShops(101L, 3); // ID 101〜103
+    when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(nameMatches);
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(List.of("マツヤ"));
+    when(repository.searchAllShopSuggestions(20L)).thenReturn(readingMatches);
+    when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = new ArrayList<>(nameMatches);
+    expected.add(readingMatches.get(0));
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, times(1)).matchesReading(any(), any());
+  }
+
+  @Test
+  void 店の候補_店名で見つからない場合は読みの候補を10件まで返すこと() {
+    List<Shop> readingMatches = createShops(101L, 12); // ID 101〜112
+    when(nameReadingService.createKeywordForms("まつや")).thenReturn(List.of("マツヤ"));
+    when(repository.searchAllShopSuggestions(20L)).thenReturn(readingMatches);
+    when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
+
+    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+
+    List<Shop> expected = readingMatches.subList(0, 10);
+    assertThat(actual).isEqualTo(expected);
+    verify(nameReadingService, times(10)).matchesReading(any(), any());
+  }
+
+  /**
+   * テスト用の店を、ID が続いた番号で作ります。
+   *
+   * @param firstId 最初の ID
+   * @param count 件数
+   * @return 店の一覧（エリアは 20、店名は「店{ID}」）
+   */
+  private List<Shop> createShops(Long firstId, int count) {
+    List<Shop> shops = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      long id = firstId + i;
+      shops.add(new Shop(id, "店" + id, 20L, 9L, false));
+    }
+    return shops;
+  }
+
+  /**
+   * 読みが当たる店名を決めます（それ以外の店名は当たらない）。
+   *
+   * @param matchingNames 読みが当たる店名
+   */
+  private void stubMatchingNames(Set<String> matchingNames) {
+    when(nameReadingService.matchesReading(any(), any()))
+        .thenAnswer(invocation -> matchingNames.contains(invocation.getArgument(0)));
   }
 
   @Test
