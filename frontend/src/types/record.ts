@@ -21,6 +21,11 @@ export type RecordDetail = {
   photoPaths: string[];
 };
 
+// 記録を削除した結果（DELETE /api/records/{id} の形）。Storage から消す写真のパスが入っている
+export type RecordDeletion = {
+  deletedPhotoPaths: string[];
+};
+
 // 記録を登録するときに送る内容（POST /api/records）
 // 商品は ID ではなく商品名で送る。同じ店に同じ名前の商品がなければ、バックエンドが作る
 export type RecordInput = {

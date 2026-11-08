@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { RecordDetail, RecordInput, RecordListPage } from "@/types/record";
 import { ApiError } from "./client";
 import {
+  deleteRecord,
   registerRecord,
   searchRecord,
   searchRecordList,
@@ -97,6 +98,40 @@ describe("searchRecord", () => {
     apiFetch.mockRejectedValue(expected);
 
     const actual = searchRecord(999);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+});
+
+describe("deleteRecord", () => {
+  test("記録の ID を URL に入れて DELETE /api/records/{id} を呼び、消した写真のパスだけを返すこと", async () => {
+    const expected = [
+      "9249f1a6-72e2-404f-bd10-fa33c077575d/records/a.webp",
+      "9249f1a6-72e2-404f-bd10-fa33c077575d/records/b.webp",
+    ];
+    apiFetch.mockResolvedValue({ deletedPhotoPaths: expected });
+
+    const actual = await deleteRecord(12);
+
+    expect(actual).toEqual(expected);
+    expect(apiFetch).toHaveBeenCalledWith("/api/records/12", {
+      method: "DELETE",
+    });
+  });
+
+  test("写真がない記録では、空の一覧を返すこと", async () => {
+    apiFetch.mockResolvedValue({ deletedPhotoPaths: [] });
+
+    const actual = await deleteRecord(12);
+
+    expect(actual).toEqual([]);
+  });
+
+  test("失敗（他人の記録の 403 など）は、そのまま投げること（削除の結果を Server Action で分けるため）", async () => {
+    const expected = new ApiError(403, "この記録を操作する権限がありません。");
+    apiFetch.mockRejectedValue(expected);
+
+    const actual = deleteRecord(12);
 
     await expect(actual).rejects.toBe(expected);
   });

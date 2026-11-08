@@ -6,6 +6,7 @@ import type {
   RecordListFilter,
   RecordListPage,
   RecordListRange,
+  RecordDeletion,
 } from "@/types/record";
 
 export function registerRecord(input: RecordInput) {
@@ -17,6 +18,14 @@ export function registerRecord(input: RecordInput) {
 
 export function searchRecord(id: number) {
   return apiFetch<RecordDetail>(`/api/records/${id}`);
+}
+
+// 記録を削除する（本人の記録だけ）。消した記録の写真のパスが返ってくる
+export async function deleteRecord(id: number): Promise<string[]> {
+  const deletion = await apiFetch<RecordDeletion>(`/api/records/${id}`, {
+    method: "DELETE",
+  });
+  return deletion.deletedPhotoPaths;
 }
 
 // ログイン中の人の記録の一覧を、1 回分（20 件まで）読む

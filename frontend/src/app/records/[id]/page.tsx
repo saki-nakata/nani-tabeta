@@ -6,6 +6,7 @@ import { searchMe } from "@/lib/api/users";
 import { getPhotoUrls } from "@/lib/photos/url";
 import type { ReactNode } from "react";
 import { PhotoGallery } from "@/components/photo-gallery";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 
 // 記録を取りに行く。見つからない（404）ときだけ null を返し、それ以外の失敗はそのまま投げる（エラーの画面になる）
 async function findRecord(id: number) {
@@ -150,6 +151,8 @@ export default async function RecordPage({
             </p>
           </section>
         )}
+        {/* 自分の記録にだけ、削除ボタンを出す */}
+        {record.userId === me.id && <DeleteRecordButton recordId={record.id} />}
       </article>
     </main>
   );
