@@ -83,7 +83,7 @@ public class RecordRequest {
    * @return 記録（IDと商品IDは未設定）
    */
   public FoodRecord toFoodRecord(String userId) {
-    return new FoodRecord(null, userId, null, eatenOn, customNote, review, rating, price);
+    return new FoodRecord(null, userId, null, eatenOn, customNote, review, rating, price, null);
   }
 
   /**

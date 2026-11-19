@@ -1,9 +1,11 @@
 package com.nanitabeta.backend.controller;
 
 import com.nanitabeta.backend.controller.request.RecordRequest;
+import com.nanitabeta.backend.controller.request.RecordUpdateRequest;
 import com.nanitabeta.backend.domain.RecordDeletion;
 import com.nanitabeta.backend.domain.RecordDetail;
 import com.nanitabeta.backend.domain.RecordListPage;
+import com.nanitabeta.backend.domain.RecordUpdateResult;
 import com.nanitabeta.backend.exception.ErrorMessage;
 import com.nanitabeta.backend.service.RecordService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -133,10 +135,13 @@ public class RecordController {
    *
    * @param id 記録ID
    * @param jwt ログイン中の利用者の JWT
-   * @param request 記録の編集内容
-   * @return 編集後の記録の詳細
+   * @param request 記録の編集内容（編集画面が読んだときの版を含む）
+   * @return 編集後の記録の詳細と、外した写真のパス
    */
-  @Operation(summary = "記録の編集", description = "記録を編集します。記録した本人だけが編集できます。写真は送られた順番で入れ直します。")
+  @Operation(summary = "記録の編集",
+      description = "記録を編集します。記録した本人だけが編集できます。写真は送られた順番で入れ直します。"
+          + "編集画面が読んだときの版（version）を送り、ほかの画面で先に保存されていた場合は 409 になります。"
+          + "返された外した写真のパスを使って、Storage 上のファイルを削除してください。")
   @ApiResponse(responseCode = "200", description = "編集成功")
   @ApiResponse(responseCode = "400", description = "入力内容に誤りがある、店・分類が存在しない、または写真のパスが正しくない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
@@ -144,9 +149,11 @@ public class RecordController {
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @ApiResponse(responseCode = "404", description = "記録が見つからない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
+  @ApiResponse(responseCode = "409", description = "ほかの画面で先に保存されている（版が違う）",
+      content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @PutMapping("/api/records/{id}")
-  public RecordDetail updateRecord(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt,
-      @RequestBody @Valid RecordRequest request) {
+  public RecordUpdateResult updateRecord(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @Valid RecordUpdateRequest request) {
     return service.updateRecord(id, request.toFoodRecord(jwt.getSubject()), request.toItem(),
         request.getPhotoPaths());
   }

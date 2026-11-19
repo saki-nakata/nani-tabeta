@@ -5,11 +5,11 @@ import { RecordGrid } from "@/components/record-grid";
 import { Button } from "@/components/ui/button";
 import { groupByYear } from "@/lib/year-groups";
 import type { Category } from "@/types/master";
-import type { RecordListItem } from "@/types/record";
+import type { RecordCardData } from "@/types/record";
 
 type RecordListProps = {
   // これまで（昨日まで）の記録（読んだ分）
-  items: RecordListItem[];
+  cards: RecordCardData[];
   // 続きがあるか
   hasMore: boolean;
   isLoading: boolean;
@@ -23,11 +23,13 @@ type RecordListProps = {
   onLoadMore: () => void;
   // 「もう一度読む」を押したとき
   onRetry: () => void;
+  // 記録を削除したとき（その記録のカードを、この欄から消す）
+  onDeleted: (recordId: number) => void;
 };
 
 // 「これまでの記録」の欄。年が変わる所に見出しを入れ、下まで来たら続きを読む
 export function RecordList({
-  items,
+  cards,
   hasMore,
   isLoading,
   errorMessage,
@@ -35,6 +37,7 @@ export function RecordList({
   categories,
   onLoadMore,
   onRetry,
+  onDeleted,
 }: RecordListProps) {
   // 一覧の下の端に置く、見えない目印。これが画面に入ったら続きを読む
   const scrollMarkerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +60,7 @@ export function RecordList({
     return () => observer.disconnect();
   }, [onLoadMore, hasMore, errorMessage]);
 
-  const yearGroups = groupByYear(items);
+  const yearGroups = groupByYear(cards);
   // 読み終わって 1 件もない（読み込み中・失敗は、0 件とは別に出す）
   const isEmpty =
     yearGroups.length === 0 && !hasMore && !isLoading && errorMessage === null;
@@ -77,7 +80,11 @@ export function RecordList({
           <h3 className="text-sm font-bold text-muted-foreground">
             {group.year}年
           </h3>
-          <RecordGrid items={group.items} categories={categories} />
+          <RecordGrid
+            cards={group.cards}
+            categories={categories}
+            onDeleted={onDeleted}
+          />
         </section>
       ))}
 

@@ -3,7 +3,7 @@ import { loadRecordList, type LoadRecordListResult } from "@/app/actions";
 import type {
   RecordListCursor,
   RecordListFilter,
-  RecordListItem,
+  RecordCardData,
 } from "@/types/record";
 
 // 記録の一覧の 1 つの欄（「今日」か「これまで」）の、読みこみの状態と読み方をまとめたフック
@@ -16,8 +16,8 @@ export function useRecordList(
   eatenFrom: string | null,
   eatenTo: string | null,
 ) {
-  const [items, setItems] = useState<RecordListItem[]>(
-    initialResult.status === "success" ? initialResult.items : [],
+  const [cards, setCards] = useState<RecordCardData[]>(
+    initialResult.status === "success" ? initialResult.cards : [],
   );
   const [nextCursor, setNextCursor] = useState<RecordListCursor | null>(
     initialResult.status === "success" ? initialResult.nextCursor : null,
@@ -50,8 +50,8 @@ export function useRecordList(
           return;
         }
         if (result.status === "success") {
-          setItems((stateItems) =>
-            cursor === null ? result.items : [...stateItems, ...result.items],
+          setCards((loadedCards) =>
+            cursor === null ? result.cards : [...loadedCards, ...result.cards],
           );
           setNextCursor(result.nextCursor);
         } else {
@@ -80,7 +80,7 @@ export function useRecordList(
   // 絞り込みを変えたときに、カードとしおりを空にして、最初から読み直す
   const reload = useCallback(
     (filter: RecordListFilter) => {
-      setItems([]);
+      setCards([]);
       setNextCursor(null);
       load(filter, null);
     },
@@ -106,13 +106,21 @@ export function useRecordList(
     [load, nextCursor],
   );
 
+  // 削除した記録のカードを、この欄から消す（読み直さずに、手元のカードから外す）
+  const removeDeletedCard = useCallback((recordId: number) => {
+    setCards((loadedCards) =>
+      loadedCards.filter((card) => card.id !== recordId),
+    );
+  }, []);
+
   return {
-    items,
+    cards,
     nextCursor,
     isLoading,
     errorMessage,
     reload,
     loadMore,
     retry,
+    removeDeletedCard,
   };
 }

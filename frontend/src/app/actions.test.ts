@@ -73,7 +73,7 @@ describe("loadRecordList", () => {
 
     expect(actual).toEqual({
       status: "success",
-      items: [
+      cards: [
         { ...cardWithoutPhoto, mainPhotoUrl: null },
         { ...cardWithPhoto, mainPhotoUrl: photoUrl },
       ],
@@ -98,7 +98,7 @@ describe("loadRecordList", () => {
 
     expect(actual).toEqual({
       status: "success",
-      items: [{ ...cardWithPhoto, mainPhotoUrl: photoUrl }],
+      cards: [{ ...cardWithPhoto, mainPhotoUrl: photoUrl }],
       nextCursor: null,
     });
   });
@@ -109,7 +109,7 @@ describe("loadRecordList", () => {
 
     const actual = await loadRecordList(allFilter, noRange, null);
 
-    expect(actual).toEqual({ status: "success", items: [], nextCursor: null });
+    expect(actual).toEqual({ status: "success", cards: [], nextCursor: null });
   });
 
   test("ログインの期限が切れている（401）ときは、ログインし直してほしいと失敗で返すこと", async () => {

@@ -9,8 +9,10 @@ import com.nanitabeta.backend.domain.RecordListCard;
 import com.nanitabeta.backend.domain.RecordListCursor;
 import com.nanitabeta.backend.domain.RecordListPage;
 import com.nanitabeta.backend.domain.RecordListQuery;
+import com.nanitabeta.backend.domain.RecordUpdateResult;
 import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidSearchConditionException;
+import com.nanitabeta.backend.exception.RecordVersionConflictException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
 import com.nanitabeta.backend.util.PhotoPathValidator;
@@ -36,6 +38,10 @@ public class RecordService {
 
   /** 年の絞り込み・食べた日の範囲で指定できる最後の年（MySQL の DATE 型が扱える範囲） */
   private static final int MAX_YEAR = 9999;
+
+  /** ほかの画面で先に保存されていたときの案内（\n で 2 行にする。画面は改行して表示する） */
+  private static final String VERSION_CONFLICT_MESSAGE =
+      "ほかの画面で先に保存されています。\n詳細画面を開き直してから、もう一度編集してください。";
 
   private RecordRepository repository;
   private ItemService itemService;
@@ -268,7 +274,7 @@ public class RecordService {
     Item linkedItem = itemService.registerItem(item); // 同じ商品があればそれを使い、なければ作る
     FoodRecord record =
         new FoodRecord(null, input.getUserId(), linkedItem.getId(), input.getEatenOn(),
-            input.getCustomNote(), input.getReview(), input.getRating(), input.getPrice());
+            input.getCustomNote(), input.getReview(), input.getRating(), input.getPrice(), null);
     repository.insertRecord(record);
     if (!paths.isEmpty()) {
       repository.insertRecordPhotos(record.getId(), paths);
@@ -306,28 +312,45 @@ public class RecordService {
    * <p>
    * 記録した本人だけが編集できます。店・商品名が変わった場合は、別の商品に付け替えます。 写真はすべて削除してから、送られた順番で入れ直します。付け替えによって前の商品の記録が
    * 0件になった場合は、前の商品を削除します。
+   * <p>
+   * 編集画面が読んだときの版（version）と今の版が違う場合（ほかの画面で先に保存された場合）は、何も変更せずに例外を投げます。
+   * 外した写真（保存の前にあって、保存の後にない写真）を、このトランザクションの中で決めて返します。
    *
    * @param id 記録ID
-   * @param input 編集後の記録（リクエストの内容。この引数は変更しない）
+   * @param input 編集後の記録（リクエストの内容。version は編集画面が読んだときの版。この引数は変更しない）
    * @param item 食べた商品（店ID・商品名・分類・季節限定）
    * @param photoPaths 写真のパスの一覧（先頭が代表写真。null の場合は写真なし）
-   * @return 編集後の記録の詳細
+   * @return 編集後の記録の詳細と、外した写真のパス
    * @throws ResourceNotFoundException 記録が見つからない場合
    * @throws ForbiddenException 記録が別の利用者のものである場合
+   * @throws RecordVersionConflictException ほかの画面で先に保存されていた場合
    */
   @Transactional
-  public RecordDetail updateRecord(Long id, FoodRecord input, Item item, List<String> photoPaths) {
+  public RecordUpdateResult updateRecord(Long id, FoodRecord input, Item item,
+      List<String> photoPaths) {
     FoodRecord myRecord = searchMyRecord(id, input.getUserId()); // 404 → 403 の順に確認
+    // 版が違えば、商品を作る前に断る（ほかの画面で先に保存された）
+    // myRecord はロックをかけて読んだので、この版は保存が終わるまでほかの保存に変えられない
+    if (!myRecord.getVersion().equals(input.getVersion())) {
+      throw new RecordVersionConflictException(VERSION_CONFLICT_MESSAGE);
+    }
     Shop shop = shopService.searchShopToLink(item.getShopId()); // 存在しない場合は InvalidShopException
     categoryService.searchCategory(item.getCategoryId()); // 存在しない場合は InvalidCategoryException
     List<String> paths =
         PhotoPathValidator.validate(input.getUserId(), PhotoPathValidator.RECORDS, photoPaths);
 
     Item linkedItem = itemService.registerItem(item); // 同じ商品があればそれを使い、なければ作る
-    FoodRecord record =
-        new FoodRecord(id, myRecord.getUserId(), linkedItem.getId(), input.getEatenOn(),
-            input.getCustomNote(), input.getReview(), input.getRating(), input.getPrice());
-    repository.updateRecord(record);
+    FoodRecord record = new FoodRecord(id, myRecord.getUserId(), linkedItem.getId(),
+        input.getEatenOn(), input.getCustomNote(), input.getReview(), input.getRating(),
+        input.getPrice(), input.getVersion());
+    // Repository が更新できなかった（0 件）場合は、例外で商品の登録も含めて取り消し、写真の変更へ進まない
+    // （上で版を比べているので、今の処理ではロック中に 0 件にならない。Repository の結果を必ず確かめるために残す）
+    if (repository.updateRecord(record) == 0) {
+      throw new RecordVersionConflictException(VERSION_CONFLICT_MESSAGE);
+    }
+
+    // 写真を入れ直す前に、保存の前の写真を読んでおく（外した写真を決めるため）
+    List<String> beforePhotoPaths = repository.searchRecordPhotoPaths(id);
     repository.deleteRecordPhotos(id);
     if (!paths.isEmpty()) {
       repository.insertRecordPhotos(id, paths);
@@ -335,8 +358,13 @@ public class RecordService {
     if (!myRecord.getItemId().equals(linkedItem.getId())) {
       itemService.deleteItemIfNoRecords(myRecord.getItemId()); // 付け替えで使われなくなった前の商品
     }
-    return new RecordDetail(repository.searchRecord(id), linkedItem, shop,
+
+    // 外した写真：保存の前にあって、入れ直した一覧にない写真（Storage から消すのは、受け取った側）
+    List<String> removedPhotoPaths =
+        beforePhotoPaths.stream().filter(path -> !paths.contains(path)).toList();
+    RecordDetail recordDetail = new RecordDetail(repository.searchRecord(id), linkedItem, shop,
         repository.searchRecordPhotoPaths(id));
+    return new RecordUpdateResult(recordDetail, removedPhotoPaths);
   }
 
   /**

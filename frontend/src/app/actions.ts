@@ -6,7 +6,7 @@ import { getPhotoUrlsOrNull } from "@/lib/photos/url";
 import type {
   RecordListCursor,
   RecordListFilter,
-  RecordListItem,
+  RecordCardData,
   RecordListRange,
 } from "@/types/record";
 
@@ -16,7 +16,7 @@ import type {
 export type LoadRecordListResult =
   | {
       status: "success";
-      items: RecordListItem[];
+      cards: RecordCardData[];
       nextCursor: RecordListCursor | null;
     }
   | { status: "failed"; message: string };
@@ -33,11 +33,11 @@ export async function loadRecordList(
     const photoUrls = await getPhotoUrlsOrNull(
       page.records.map((card) => card.mainPhotoPath),
     );
-    const items = page.records.map((card, index) => ({
+    const cards = page.records.map((card, index) => ({
       ...card,
       mainPhotoUrl: photoUrls[index],
     }));
-    return { status: "success", items, nextCursor: page.nextCursor };
+    return { status: "success", cards, nextCursor: page.nextCursor };
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return {

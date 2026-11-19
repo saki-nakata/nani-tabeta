@@ -24,10 +24,12 @@ import com.nanitabeta.backend.domain.RecordDetail;
 import com.nanitabeta.backend.domain.RecordListCard;
 import com.nanitabeta.backend.domain.RecordListCursor;
 import com.nanitabeta.backend.domain.RecordListPage;
+import com.nanitabeta.backend.domain.RecordUpdateResult;
 import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 import com.nanitabeta.backend.exception.InvalidSearchConditionException;
 import com.nanitabeta.backend.exception.InvalidShopException;
+import com.nanitabeta.backend.exception.RecordVersionConflictException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.service.RecordService;
 import java.time.Clock;
@@ -49,6 +51,8 @@ class RecordControllerTest {
 
   private static final String PHOTO =
       USER_ID + "/records/0b3c9f2a-1234-4abc-9def-0123456789ab.webp";
+  private static final String OLD_PHOTO =
+      USER_ID + "/records/3a4b5c6d-9012-4cde-8f01-23456789abcd.webp";
 
   @Autowired
   private MockMvc mockMvc;
@@ -80,8 +84,13 @@ class RecordControllerTest {
         """.formatted(eatenOn, PHOTO);
   }
 
+  /** 編集のリクエスト（登録と同じ内容に、編集画面が読んだときの版 version を足したもの） */
+  private static String updateRequestBody(String eatenOn) {
+    return requestBody(eatenOn).replace("\"photoPaths\"", "\"version\": 3, \"photoPaths\"");
+  }
+
   private static RecordDetail recordDetail(LocalDate eatenOn) {
-    return new RecordDetail(new FoodRecord(1L, USER_ID, 6L, eatenOn, null, "衣がサクサク", 4, 220),
+    return new RecordDetail(new FoodRecord(1L, USER_ID, 6L, eatenOn, null, "衣がサクサク", 4, 220, 0),
         new Item(6L, 2L, "からあげ棒", 4L, false), new Shop(2L, "セブンイレブン", 20L, 1L, false),
         List.of(PHOTO));
   }
@@ -93,7 +102,8 @@ class RecordControllerTest {
     mockMvc.perform(get("/api/records/1").with(registeredUser())).andExpect(status().isOk())
         .andExpect(content().json("""
             {"record": {"id": 1, "userId": "%s", "itemId": 6, "eatenOn": "2020-01-01",
-                        "customNote": null, "review": "衣がサクサク", "rating": 4, "price": 220},
+                        "customNote": null, "review": "衣がサクサク", "rating": 4, "price": 220,
+                        "version": 0},
              "item": {"id": 6, "shopId": 2, "itemName": "からあげ棒", "categoryId": 4,
                       "isSeasonal": false},
              "shop": {"id": 2, "shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1,
@@ -118,7 +128,7 @@ class RecordControllerTest {
     LocalDate eatenOn = LocalDate.of(2020, 1, 1);
     when(service.registerRecord(any(), any(), any())).thenReturn(recordDetail(eatenOn));
     FoodRecord expectedRecord =
-        new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220);
+        new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220, null);
     Item expectedItem = new Item(null, 2L, "からあげ棒", 4L, false);
 
     mockMvc
@@ -234,17 +244,21 @@ class RecordControllerTest {
   @Test
   void 記録の編集_JWTのsubを操作する人として編集し200が返ること() throws Exception {
     LocalDate eatenOn = LocalDate.of(2020, 1, 1);
-    when(service.updateRecord(any(), any(), any(), any())).thenReturn(recordDetail(eatenOn));
+    when(service.updateRecord(any(), any(), any(), any()))
+        .thenReturn(new RecordUpdateResult(recordDetail(eatenOn), List.of(OLD_PHOTO)));
+    // 本文の version（3）が、編集する記録の版として Service に渡ること
     FoodRecord expectedRecord =
-        new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220);
+        new FoodRecord(null, USER_ID, null, eatenOn, null, "衣がサクサク", 4, 220, 3);
     Item expectedItem = new Item(null, 2L, "からあげ棒", 4L, false);
 
     mockMvc
         .perform(put("/api/records/1").with(registeredUser())
-            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
         .andExpect(status().isOk()).andExpect(content().json("""
-            {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01"}}
-            """.formatted(USER_ID)));
+            {"recordDetail": {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01",
+                                         "version": 0}},
+             "removedPhotoPaths": ["%s"]}
+            """.formatted(USER_ID, OLD_PHOTO)));
 
     verify(service).updateRecord(1L, expectedRecord, expectedItem, List.of(PHOTO));
   }
@@ -254,7 +268,7 @@ class RecordControllerTest {
     // 登録と同じリクエストを使うので、編集でも未来の日付は断られる
     mockMvc
         .perform(put("/api/records/1").with(registeredUser())
-            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-02\"")))
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-02\"")))
         .andExpect(status().isBadRequest()).andExpect(content().json("""
             {"statusValue": 400, "statusName": "BAD_REQUEST",
              "message": "食べた日に未来の日付は指定できません。"}
@@ -270,7 +284,7 @@ class RecordControllerTest {
 
     mockMvc
         .perform(put("/api/records/3").with(registeredUser())
-            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
         .andExpect(status().isForbidden()).andExpect(content().json("""
             {"statusValue": 403, "statusName": "FORBIDDEN",
              "message": "この記録を変更する権限がありません。id=3"}
@@ -284,8 +298,35 @@ class RecordControllerTest {
 
     mockMvc
         .perform(put("/api/records/999").with(registeredUser())
-            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void 記録の編集_版を送らない場合は400が返ること() throws Exception {
+    // 登録と同じ本文（version なし）を編集に送ると、断られる
+    mockMvc
+        .perform(put("/api/records/1").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(requestBody("\"2020-01-01\"")))
+        .andExpect(status().isBadRequest()).andExpect(content().json("""
+            {"statusValue": 400, "statusName": "BAD_REQUEST", "message": "記録の版を指定してください。"}
+            """));
+
+    verify(service, never()).updateRecord(any(), any(), any(), any());
+  }
+
+  @Test
+  void 記録の編集_ほかの画面で先に保存されていた場合は409が返ること() throws Exception {
+    when(service.updateRecord(any(), any(), any(), any())).thenThrow(
+        new RecordVersionConflictException("ほかの画面で先に保存されています。\n詳細画面を開き直してから、もう一度編集してください。"));
+
+    mockMvc
+        .perform(put("/api/records/1").with(registeredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
+        .andExpect(status().isConflict()).andExpect(content().json("""
+            {"statusValue": 409, "statusName": "CONFLICT",
+             "message": "ほかの画面で先に保存されています。\\n詳細画面を開き直してから、もう一度編集してください。"}
+            """));
   }
 
   @Test

@@ -59,7 +59,7 @@ class RecordServiceTransactionTest {
   private RecordRepository recordRepository; // 指定がなければ本物と同じ動きをする
 
   private FoodRecord input() {
-    return new FoodRecord(null, USER_ID, null, LocalDate.of(2026, 9, 27), null, null, 4, null);
+    return new FoodRecord(null, USER_ID, null, LocalDate.of(2026, 9, 27), null, null, 4, null, 0);
   }
 
   @Test

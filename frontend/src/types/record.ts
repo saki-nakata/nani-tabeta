@@ -11,6 +11,7 @@ export type FoodRecord = {
   review: string | null;
   rating: number;
   price: number | null;
+  version: number; // 版（編集を保存するたびに 1 増える。編集の保存のときに送り返す）
 };
 
 // 記録の詳細（記録と、その商品・店・写真）。登録したときと、1 件取得したときに返ってくる
@@ -19,6 +20,13 @@ export type RecordDetail = {
   item: Item;
   shop: Shop;
   photoPaths: string[];
+};
+
+// 記録を編集した結果（PUT /api/records/{id} の形）
+// 外した写真は、バックエンドが保存と同じ処理の中で決めたもの。Storage から消すのは受け取った側
+export type RecordUpdateResult = {
+  recordDetail: RecordDetail;
+  removedPhotoPaths: string[];
 };
 
 // 記録を削除した結果（DELETE /api/records/{id} の形）。Storage から消す写真のパスが入っている
@@ -73,7 +81,7 @@ export type RecordListFilter = {
 };
 
 // 記録の一覧の 1 マス分を、画面に出す形にしたもの（代表写真の表示用の URL を足した）
-export type RecordListItem = RecordListCard & {
+export type RecordCardData = RecordListCard & {
   mainPhotoUrl: string | null;
 };
 

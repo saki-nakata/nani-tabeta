@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { RecordDetail, RecordInput, RecordListPage } from "@/types/record";
+import type {
+  RecordDetail,
+  RecordInput,
+  RecordListPage,
+  RecordUpdateResult,
+} from "@/types/record";
 import { ApiError } from "./client";
 import {
   deleteRecord,
+  findRecord,
   registerRecord,
   searchRecord,
+  updateRecord,
   searchRecordList,
   searchRecordYears,
 } from "./records";
@@ -26,6 +33,7 @@ const recordDetail: RecordDetail = {
     review: "衣がサクサクでおいしかった",
     rating: 4,
     price: 220,
+    version: 3,
   },
   item: {
     id: 7,
@@ -98,6 +106,98 @@ describe("searchRecord", () => {
     apiFetch.mockRejectedValue(expected);
 
     const actual = searchRecord(999);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+});
+
+describe("findRecord", () => {
+  test("記録があれば、その記録の詳細を返すこと", async () => {
+    apiFetch.mockResolvedValue(recordDetail);
+
+    const actual = await findRecord(12);
+
+    expect(actual).toEqual(recordDetail);
+    expect(apiFetch).toHaveBeenCalledWith("/api/records/12");
+  });
+
+  test("見つからない（404）ときは、null を返すこと", async () => {
+    apiFetch.mockRejectedValue(new ApiError(404, "記録が見つかりません。"));
+
+    const actual = await findRecord(999);
+
+    expect(actual).toBeNull();
+  });
+
+  test("404 以外の失敗は、そのまま投げること（エラーの画面にするため）", async () => {
+    const expected = new ApiError(500, "サーバーでエラーが発生しました。");
+    apiFetch.mockRejectedValue(expected);
+
+    const actual = findRecord(12);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+});
+
+describe("updateRecord", () => {
+  test("記録の ID を URL に入れて PUT /api/records/{id} を呼び、入力に版（version）を足して送り、編集の結果を返すこと", async () => {
+    const input: RecordInput = {
+      shopId: 4,
+      itemName: "抹茶ラテ",
+      categoryId: 10,
+      isSeasonal: false,
+      eatenOn: "2026-11-08",
+      rating: 5,
+      review: null,
+      customNote: "氷少なめ",
+      price: 520,
+      photoPaths: ["9249f1a6-72e2-404f-bd10-fa33c077575d/records/a.webp"],
+    };
+    const expected: RecordUpdateResult = {
+      recordDetail,
+      removedPhotoPaths: [
+        "9249f1a6-72e2-404f-bd10-fa33c077575d/records/b.webp",
+      ],
+    };
+    apiFetch.mockResolvedValue(expected);
+
+    const actual = await updateRecord(12, input, 3);
+
+    expect(actual).toEqual(expected);
+    expect(apiFetch).toHaveBeenCalledWith("/api/records/12", {
+      method: "PUT",
+      body: { ...input, version: 3 },
+    });
+  });
+
+  test("版が 0（一度も編集していない記録）でも、version: 0 を送ること", async () => {
+    apiFetch.mockResolvedValue({ recordDetail, removedPhotoPaths: [] });
+
+    await updateRecord(12, {} as RecordInput, 0);
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/records/12", {
+      method: "PUT",
+      body: { version: 0 },
+    });
+  });
+
+  test("失敗（他人の記録の 403 など）は、そのまま投げること", async () => {
+    const expected = new ApiError(403, "この記録を変更する権限がありません。");
+    apiFetch.mockRejectedValue(expected);
+
+    const actual = updateRecord(12, {} as RecordInput, 3);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+
+  test("ほかの画面で先に保存されていた（409）ときも、そのまま投げること（Server Action で failed にするため）", async () => {
+    const expected = new ApiError(
+      409,
+      "ほかの画面で先に保存されています。\n詳細画面を開き直してから、もう一度編集してください。",
+    );
+    apiFetch.mockRejectedValue(expected);
+
+    const actual = updateRecord(12, {} as RecordInput, 3);
 
     await expect(actual).rejects.toBe(expected);
   });

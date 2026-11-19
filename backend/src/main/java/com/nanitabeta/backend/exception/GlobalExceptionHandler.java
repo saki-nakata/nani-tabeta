@@ -208,6 +208,21 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * 記録の編集で、ほかの画面で先に保存されていた場合の例外を処理します。
+   *
+   * @param ex 発生した例外
+   * @return HTTP 409 とエラー内容
+   */
+  @ExceptionHandler(RecordVersionConflictException.class)
+  public ResponseEntity<ErrorMessage> handleRecordVersionConflict(
+      RecordVersionConflictException ex) {
+    log.warn("古い版からの記録の編集が行われました: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.CONFLICT;
+    ErrorMessage error = new ErrorMessage(status.value(), status.name(), ex.getMessage());
+    return ResponseEntity.status(status).body(error);
+  }
+
+  /**
    * ユーザーがすでに登録されている場合の例外を処理します。
    *
    * @param ex 発生した例外

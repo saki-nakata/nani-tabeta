@@ -30,6 +30,12 @@ import {
   type SubmitRecordResult,
 } from "@/app/records/new/actions";
 import { deletePhotos, uploadPhotos } from "@/lib/photos/upload";
+import {
+  saveRecord,
+  type SaveRecordResult,
+} from "@/app/records/[id]/edit/actions";
+import type { RecordDetail, RecordInput } from "@/types/record";
+import { CancelEditButton } from "@/components/cancel-edit-button";
 
 // 店を登録できなかったときの案内
 const SHOP_FAILED_MESSAGE =
@@ -40,6 +46,9 @@ const PHOTO_FAILED_MESSAGE =
 // 記録できたか確かめられなかったときの案内（もう一度押すと重複しうることも伝える）
 const UNKNOWN_RECORD_MESSAGE =
   "記録できたか確認できませんでした。すでに登録されている可能性があります。もう一度「記録する」を押すと、同じ記録が重複することがあります。";
+// 保存できたか確かめられなかったときの案内（編集。もう一度押す前に、詳細で確かめてもらう）
+const UNKNOWN_SAVE_MESSAGE =
+  "保存できたか確認できませんでした。詳細画面で保存されたか確かめてから、もう一度保存してください。";
 
 type RecordFormProps = {
   today: string;
@@ -47,6 +56,10 @@ type RecordFormProps = {
   shopKinds: ShopKind[];
   categories: Category[];
   initialAreaId: number | null;
+  // 編集するときの今の記録（登録のときは渡さない）
+  editingRecord?: RecordDetail;
+  // 編集するときの今の写真（登録のときは渡さない）
+  initialPhotos?: SelectedPhoto[];
 };
 
 export function RecordForm({
@@ -55,23 +68,35 @@ export function RecordForm({
   shopKinds,
   categories,
   initialAreaId,
+  editingRecord,
+  initialPhotos,
 }: RecordFormProps) {
   const router = useRouter();
 
-  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
+  // 編集のときは、今の記録の値を最初の値にする
+  const [photos, setPhotos] = useState<SelectedPhoto[]>(initialPhotos ?? []);
   const [areaId, setAreaId] = useState(initialAreaId);
-  const [selectedShop, setSelectedShop] = useState<SelectedShop | null>(null);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedShop, setSelectedShop] = useState<SelectedShop | null>(
+    editingRecord ? { type: "registered", shop: editingRecord.shop } : null,
+  );
+  const [selectedItem, setSelectedItem] = useState<Item | null>(
+    editingRecord?.item ?? null,
+  );
   const [newItem, setNewItem] = useState<NewItem>(EMPTY_NEW_ITEM);
-  const [eatenOn, setEatenOn] = useState(today);
-  const [rating, setRating] = useState(0);
-  const [review, setReview] = useState("");
-  const [price, setPrice] = useState("");
+  const [eatenOn, setEatenOn] = useState(
+    editingRecord?.record.eatenOn ?? today,
+  );
+  const [rating, setRating] = useState(editingRecord?.record.rating ?? 0);
+  const [review, setReview] = useState(editingRecord?.record.review ?? "");
+  // 価格は入力欄の文字として持つ（null なら空、220 なら "220"）
+  const [price, setPrice] = useState(String(editingRecord?.record.price ?? ""));
   // 「記録する」を押したときの案内（足りないもの・失敗の理由）
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   // 確かめている・送っている途中か（その間は入力もボタンも押せなくする）
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customNote, setCustomNote] = useState("");
+  const [customNote, setCustomNote] = useState(
+    editingRecord?.record.customNote ?? "",
+  );
   const [editPrice, setEditPrice] = useState(false);
 
   // 店やエリアを変えたら、選んだ商品も入力中の商品も消す（別の店の商品が残らないように）
@@ -93,7 +118,28 @@ export function RecordForm({
     }
   }
 
-  // 入力を確かめて、店の登録 → 写真のアップロード → 記録の登録 を行う
+  // 価格の欄の文字を、保存するときと同じ数にする（空なら null。「0220」と「220」は同じ 220）
+  function priceOrNull(value: string) {
+    const normalized = normalizePrice(value);
+    return normalized === "" ? null : Number(normalized);
+  }
+
+  // 編集画面を開いたときから、何か変えたか（キャンセルで確かめるかどうかに使う）
+  // 写真は、並び順も含めて比べる（id を並べた文字にして比べる）
+  const isChanged =
+    editingRecord !== undefined &&
+    (selectedShop?.type !== "registered" ||
+      selectedShop.shop.id !== editingRecord.shop.id ||
+      selectedItem?.id !== editingRecord.item.id ||
+      eatenOn !== editingRecord.record.eatenOn ||
+      rating !== editingRecord.record.rating ||
+      review !== (editingRecord.record.review ?? "") ||
+      priceOrNull(price) !== editingRecord.record.price ||
+      customNote !== (editingRecord.record.customNote ?? "") ||
+      photos.map((photo) => photo.id).join("\n") !==
+        editingRecord.photoPaths.join("\n"));
+
+  // 入力を確かめて、店の登録 → 写真のアップロード → 記録の登録（編集のときは保存） を行う
   // 成功したら詳細画面へ移って空の配列を返す。途中で止まったら、案内を返す
   async function sendRecord(): Promise<string[]> {
     // ① 入力がそろっているか
@@ -145,38 +191,78 @@ export function RecordForm({
       shopId = shopResult.shop.id;
     }
 
-    // ④ 写真を縮めて置く（途中で失敗したら、uploadPhotos が置いた分の削除を試みてから投げる）
-    let photoPaths: string[];
+    // ④ 新しい写真だけを縮めて置く（途中で失敗したら、uploadPhotos が置いた分の削除を試みてから投げる）
+    // 保存済みの写真は、もう Storage にあるので置かない
+    const newFiles = photos.flatMap((photo) =>
+      photo.type === "new" ? [photo.file] : [],
+    );
+    let uploadedPaths: string[];
     try {
-      photoPaths = await uploadPhotos(
-        photos.map((photo) => photo.file),
-        "records",
-      );
+      uploadedPaths = await uploadPhotos(newFiles, "records");
     } catch {
       return [PHOTO_FAILED_MESSAGE];
     }
+    // 欄に並んだ順に、写真のパスを組み立てる（新しい写真には、置いた順にパスを当てはめる）
+    const photoPaths: string[] = [];
+    let uploadedIndex = 0;
+    for (const photo of photos) {
+      if (photo.type === "saved") {
+        photoPaths.push(photo.path);
+      } else {
+        photoPaths.push(uploadedPaths[uploadedIndex]);
+        uploadedIndex++;
+      }
+    }
 
-    // ⑤ 記録を登録する
-    const normalizedPrice = normalizePrice(price);
+    // 送る内容（登録と編集で同じ形）
+    const input: RecordInput = {
+      shopId,
+      ...itemToSendResult.item,
+      eatenOn,
+      rating,
+      review: review.trim() === "" ? null : review,
+      customNote: customNote.trim() === "" ? null : customNote,
+      price: priceOrNull(price),
+      photoPaths,
+    };
+
+    // ⑤-a 編集：記録を保存して、詳細画面へ戻る
+    if (editingRecord) {
+      const recordId = editingRecord.record.id;
+      let saveResult: SaveRecordResult;
+      try {
+        saveResult = await saveRecord(
+          recordId,
+          editingRecord.record.version,
+          input,
+        );
+      } catch {
+        // 返事が届かなかった：保存されたかわからないので、写真は消さない
+        return [UNKNOWN_SAVE_MESSAGE];
+      }
+      if (saveResult.status === "failed") {
+        // この頼みでは保存されていないので、今回置いた新しい写真だけ削除を試みる（保存済みの写真は消さない）
+        await deletePhotos(uploadedPaths);
+        return [saveResult.message];
+      }
+      if (saveResult.status === "unknown") {
+        return [UNKNOWN_SAVE_MESSAGE];
+      }
+      router.push(`/records/${recordId}`);
+      return [];
+    }
+
+    // ⑤-b 登録：記録を登録する
     let recordResult: SubmitRecordResult;
     try {
-      recordResult = await submitRecord({
-        shopId,
-        ...itemToSendResult.item,
-        eatenOn,
-        rating,
-        review: review.trim() === "" ? null : review,
-        customNote: customNote.trim() === "" ? null : customNote,
-        price: normalizedPrice === "" ? null : Number(normalizedPrice),
-        photoPaths,
-      });
+      recordResult = await submitRecord(input);
     } catch {
       // 返事が届かなかった：登録されたかわからないので、写真は消さない
       return [UNKNOWN_RECORD_MESSAGE];
     }
     if (recordResult.status === "failed") {
       // 確実に登録されていないので、置いた写真の削除を試みる（消せなかった分は、日次バッチで片付ける予定。まだ作っていない）
-      await deletePhotos(photoPaths);
+      await deletePhotos(uploadedPaths);
       return [recordResult.message];
     }
     if (recordResult.status === "unknown") {
@@ -194,12 +280,14 @@ export function RecordForm({
     photosRef.current = photos;
   }, [photos]);
 
-  // 画面を離れるときに、残っているプレビュー用の URL を片付ける
+  // 画面を離れるときに、残っているプレビュー用の URL を片付ける（新しい写真だけ。保存済みの写真は片付けるものがない）
   useEffect(
     () => () => {
-      photosRef.current.forEach((selectedPhoto) =>
-        URL.revokeObjectURL(selectedPhoto.previewUrl),
-      );
+      photosRef.current.forEach((photo) => {
+        if (photo.type === "new") {
+          URL.revokeObjectURL(photo.previewUrl);
+        }
+      });
     },
     [],
   );
@@ -320,18 +408,32 @@ export function RecordForm({
         </p>
       </div>
       {errorMessages.length > 0 && (
+        // 案内の \n で改行する（バックエンドの案内にも、改行を入れたものがある）
         <ul
           role="alert"
-          className="flex flex-col gap-1 text-sm text-destructive"
+          className="flex flex-col gap-1 text-sm whitespace-pre-line text-destructive"
         >
           {errorMessages.map((message) => (
             <li key={message}>{message}</li>
           ))}
         </ul>
       )}
-      <Button type="button" onClick={handleSubmit}>
-        {isSubmitting ? "記録しています…" : "記録する"}
-      </Button>
+      {editingRecord ? (
+        // 編集：キャンセルと保存を横に並べる
+        <div className="flex gap-2">
+          <CancelEditButton
+            href={`/records/${editingRecord.record.id}`}
+            isChanged={isChanged}
+          />
+          <Button type="button" className="flex-1" onClick={handleSubmit}>
+            {isSubmitting ? "保存しています…" : "保存する"}
+          </Button>
+        </div>
+      ) : (
+        <Button type="button" onClick={handleSubmit}>
+          {isSubmitting ? "記録しています…" : "記録する"}
+        </Button>
+      )}
     </fieldset>
   );
 }

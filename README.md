@@ -11,6 +11,8 @@
 - Google でのログインとユーザー登録
 - 記録の登録（店・商品の候補、写真）と、記録の詳細
 - 記録の一覧（分類・業態・年での絞り込み、今日の記録、無限スクロール）
+- 記録の編集・削除（写真の追加・削除・ドラッグでの並べ替え、一覧のカードからも編集・削除）
+- 店名・商品名の候補を、ひらがなの読みでも探せる
 
 - [x] 要件定義
 - [x] ER図・テーブル設計
@@ -28,13 +30,13 @@
 | 領域 | 技術 |
 |---|---|
 | フロントエンド | Next.js 16.4.3 (App Router) / React 19.3.1 / TypeScript 5.9 / Tailwind CSS v4 |
-| UIコンポーネント | shadcn/ui（横スクロールの Carousel は Embla Carousel）/ next-themes（ライト・ダーク） |
+| UIコンポーネント | shadcn/ui（横スクロールの Carousel は Embla Carousel）/ next-themes（ライト・ダーク）/ dnd-kit（写真の並べ替え） |
 | バックエンド | Java 25 / Spring Boot 4.0.8 / MyBatis / Flyway |
 | データベース | MySQL 8.4（Docker Compose）|
 | 認証 | Supabase Auth（Google OAuth）。サーバー側は Spring Security で JWT を検証 |
 | ファイル保存 | Supabase Storage（記録の写真） |
 | 読みの取得 | Sudachi 0.8.2＋SudachiDict core（ひらがなで漢字の店名・商品名を探す） |
-| テスト | Vitest（フロントエンド）/ JUnit・Spring Boot Test（バックエンド） |
+| テスト | Vitest・Testing Library（フロントエンド）/ JUnit・Spring Boot Test（バックエンド）/ Playwright（E2E） |
 | 整形 | Prettier（フロントエンド）/ Spotless（バックエンド） |
 
 ### 今後実装
@@ -105,6 +107,7 @@ API_BASE_URL=http://localhost:8080
 | `NEXT_PUBLIC_SUPABASE_URL` | 上の `SUPABASE_URL` と同じ Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase のダッシュボードの **Project Settings → API Keys** にある publishable key（ブラウザに渡してよいキー） |
 | `API_BASE_URL` | Spring Boot の API の場所。Next.js のサーバーだけが使い、ブラウザには渡しません |
+| `E2E_USER_EMAIL`・`E2E_USER_PASSWORD` | E2E テスト（Playwright）でログインするテスト用アカウント。Supabase Auth に**メールアドレスとパスワードで**作ったユーザー（Google ログインのユーザーは使えません）。E2E テストを動かさないなら空のままでよい |
 
 `.env` と `frontend/.env.local` は Git 管理外です。コミットしないでください。
 
@@ -182,12 +185,37 @@ pnpm dev              # http://localhost:3000
 | バックエンドの整形の確認 | `.\gradlew spotlessCheck` | `backend` |
 | フロントエンドの起動 | `pnpm dev` | `frontend` |
 | フロントエンドのテスト | `pnpm test` | `frontend` |
+| E2E テスト（Playwright） | `pnpm test:e2e` | `frontend` |
 | 静的検査 | `pnpm lint` | `frontend` |
 | フロントエンドの整形 | `pnpm format` | `frontend` |
 | フロントエンドの整形の確認 | `pnpm format:check` | `frontend` |
 | 本番ビルドの確認 | `pnpm build` | `frontend` |
 
 バックエンドの整形のしくみ（Spotless・エディタの保存時の整形）は、[backend/config/README.md](backend/config/README.md) にまとめています。
+
+### E2E テスト（Playwright）
+
+画面で入力 → 保存 → 結果が出る、という操作の流れを、本物のブラウザ・バックエンド・DB・Storage で確かめます（`frontend/e2e/`）。
+入力の細かい組み合わせやエラーの処理は、Vitest・JUnit のテストで確かめています。
+
+**動かす前に**
+
+1. テスト用のブラウザを入れる（初めてのときだけ）：`pnpm exec playwright install chromium`（`frontend`）
+2. `frontend/.env.local` に `E2E_USER_EMAIL`・`E2E_USER_PASSWORD` を書く（上の「環境変数を用意する」を参照）
+3. テスト用アカウントで、**アプリの利用登録（ニックネームの登録）を済ませておく**。Supabase にユーザーがあるだけで、アプリの `users` に登録されていないと、記録の画面を開けません
+4. 開発 DB に、**長野県の「スタバ」と、その店の「ラテ」（記録が 1 件以上ある商品）がある**ようにしておく。記録の編集のテストは、この店と商品を候補から選んで記録を作ります
+5. MySQL とバックエンドを起動しておく（`docker compose up -d`・`.\gradlew bootRun`）。フロントエンドは、起動していなければ Playwright が `pnpm dev` で起動します
+
+**動かす**
+
+```powershell
+cd frontend
+pnpm test:e2e
+pnpm exec playwright show-report   # 結果をブラウザで見る
+```
+
+- 最初に `e2e/auth.setup.ts` がテスト用アカウントで Supabase にログインし、その状態を `playwright/.auth/user.json` に保存します（Git 管理外）。ほかのテストはその状態を使います
+- テストで作った記録は、記録の ID を取れていれば、テストの最後（`afterEach`）に詳細画面の「削除」で消すことを試みます。テストが途中で失敗しても試みますが、記録を作ったあと、記録の ID を取るまでの間に失敗したとき（「記録する」は成功していても、詳細画面の URL を確かめる前に止まった など）や、削除そのものが失敗したときは、記録が残ることがあります（感想が「E2E 編集前／編集後 …」の記録）。テスト用アカウントの既存の記録には触りません
 
 ### MySQL に接続するときの注意（Windows）
 

@@ -66,7 +66,7 @@ export function RecordHome({
 
       <TodayRecords
         dateLabel={todayLabel}
-        items={todayList.items}
+        cards={todayList.cards}
         hasMore={todayList.nextCursor !== null}
         isLoading={todayList.isLoading}
         errorMessage={todayList.errorMessage}
@@ -74,6 +74,7 @@ export function RecordHome({
         categories={categories}
         onLoadMore={() => todayList.loadMore(filter)}
         onRetry={() => todayList.retry(filter)}
+        onDeleted={todayList.removeDeletedCard}
       />
 
       <section className="flex flex-col gap-3 border-t pt-6">
@@ -82,7 +83,7 @@ export function RecordHome({
           <p className="text-xs text-muted-foreground">食べた日が新しい順</p>
         </div>
         <RecordList
-          items={historyList.items}
+          cards={historyList.cards}
           hasMore={historyList.nextCursor !== null}
           isLoading={historyList.isLoading}
           errorMessage={historyList.errorMessage}
@@ -90,6 +91,7 @@ export function RecordHome({
           categories={categories}
           onLoadMore={loadMoreHistory}
           onRetry={() => historyList.retry(filter)}
+          onDeleted={historyList.removeDeletedCard}
         />
       </section>
     </div>
