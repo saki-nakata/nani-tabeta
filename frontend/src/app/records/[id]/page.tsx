@@ -1,24 +1,13 @@
 import { notFound, redirect } from "next/navigation";
-import { ApiError } from "@/lib/api/client";
 import { searchCategories, searchRegionDetails } from "@/lib/api/masters";
-import { searchRecord } from "@/lib/api/records";
+import { findRecord } from "@/lib/api/records";
 import { searchMe } from "@/lib/api/users";
 import { getPhotoUrls } from "@/lib/photos/url";
 import type { ReactNode } from "react";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { DeleteRecordButton } from "@/components/delete-record-button";
-
-// 記録を取りに行く。見つからない（404）ときだけ null を返し、それ以外の失敗はそのまま投げる（エラーの画面になる）
-async function findRecord(id: number) {
-  try {
-    return await searchRecord(id);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null;
-    }
-    throw error;
-  }
-}
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 
 // 食べた日を「2026年10月17日」の形にする（"2026-10-17" の文字を分けて組み立てる）
 function formatEatenOn(eatenOn: string) {
@@ -151,8 +140,18 @@ export default async function RecordPage({
             </p>
           </section>
         )}
-        {/* 自分の記録にだけ、削除ボタンを出す */}
-        {record.userId === me.id && <DeleteRecordButton recordId={record.id} />}
+        {/* 自分の記録にだけ、編集・削除のボタンを出す */}
+        {record.userId === me.id && (
+          <div className="flex items-start justify-end gap-2 border-t pt-6">
+            <Link
+              href={`/records/${record.id}/edit`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              編集
+            </Link>
+            <DeleteRecordButton recordId={record.id} />
+          </div>
+        )}
       </article>
     </main>
   );

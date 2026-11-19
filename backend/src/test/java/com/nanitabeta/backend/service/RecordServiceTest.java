@@ -20,11 +20,13 @@ import com.nanitabeta.backend.domain.RecordListCard;
 import com.nanitabeta.backend.domain.RecordListCursor;
 import com.nanitabeta.backend.domain.RecordListPage;
 import com.nanitabeta.backend.domain.RecordListQuery;
+import com.nanitabeta.backend.domain.RecordUpdateResult;
 import com.nanitabeta.backend.exception.ForbiddenException;
 import com.nanitabeta.backend.exception.InvalidCategoryException;
 import com.nanitabeta.backend.exception.InvalidPhotoPathException;
 import com.nanitabeta.backend.exception.InvalidSearchConditionException;
 import com.nanitabeta.backend.exception.InvalidShopException;
+import com.nanitabeta.backend.exception.RecordVersionConflictException;
 import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
 import java.time.LocalDate;
@@ -45,6 +47,8 @@ class RecordServiceTest {
       USER_ID + "/records/0b3c9f2a-1234-4abc-9def-0123456789ab.webp";
   private static final String PHOTO_2 =
       USER_ID + "/records/7e1d2c3b-5678-4def-8abc-ba9876543210.webp";
+  private static final String PHOTO_3 =
+      USER_ID + "/records/3a4b5c6d-9012-4cde-8f01-23456789abcd.webp";
   private static final LocalDate EATEN_ON = LocalDate.of(2026, 9, 27);
   private static final String OTHER_USER_ID = "fa92b95a-22dd-4309-8f76-e53072d5d04c";
   private static final LocalDate OCTOBER_24 = LocalDate.of(2026, 10, 24);
@@ -69,7 +73,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の詳細_記録と商品と店と写真をまとめて返すこと() {
-    FoodRecord record = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
+    FoodRecord record = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, 0);
     Item item = new Item(6L, 2L, "からあげ棒", 4L, false);
     Shop shop = new Shop(2L, "セブンイレブン", 20L, 1L, false);
     when(repository.searchRecord(1L)).thenReturn(record);
@@ -95,7 +99,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_商品を用意してから記録と写真を登録し記録の詳細を返すこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "衣がサクサク", 4, 220);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "衣がサクサク", 4, 220, null);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     Item linkedItem = new Item(6L, 2L, "からあげ棒", 4L, false);
     Shop shop = new Shop(2L, "セブンイレブン", 20L, 1L, false);
@@ -106,11 +110,13 @@ class RecordServiceTest {
       inserted.setId(1L); // DB が振った ID を書き戻す（useGeneratedKeys の代わり）
       return null;
     }).when(repository).insertRecord(any());
-    FoodRecord registered = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
+    FoodRecord registered = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, 0);
     when(repository.searchRecord(1L)).thenReturn(registered);
     when(repository.searchRecordPhotoPaths(1L)).thenReturn(List.of(PHOTO_1, PHOTO_2));
     // insertRecord に渡した記録（ID は INSERT で書き戻された値）
-    FoodRecord expectedArgument = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
+    // 登録では版を送らない（DB が 0 を入れる）
+    FoodRecord expectedArgument =
+        new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, null);
     RecordDetail expected =
         new RecordDetail(registered, linkedItem, shop, List.of(PHOTO_1, PHOTO_2));
 
@@ -128,11 +134,11 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_写真が指定されていない場合は写真を登録しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, null);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
     when(repository.searchRecord(any()))
-        .thenReturn(new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null));
+        .thenReturn(new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null, 0));
 
     sut.registerRecord(input, item, null);
 
@@ -142,11 +148,11 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_写真が空のリストの場合は写真を登録しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, null);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
     when(repository.searchRecord(any()))
-        .thenReturn(new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null));
+        .thenReturn(new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null, 0));
 
     sut.registerRecord(input, item, List.of());
 
@@ -155,7 +161,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_店が存在しない場合は例外を投げて何も登録しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, null);
     Item item = new Item(null, 999L, "からあげ棒", 4L, false);
     doThrow(new InvalidShopException("指定された店が存在しません。shopId=999")).when(shopService)
         .searchShopToLink(999L);
@@ -170,7 +176,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_分類が存在しない場合は例外を投げて何も登録しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, null);
     Item item = new Item(null, 2L, "からあげ棒", 999L, false);
     doThrow(new InvalidCategoryException("指定された分類が存在しません。categoryId=999")).when(categoryService)
         .searchCategory(999L);
@@ -184,7 +190,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の登録_写真のパスが正しくない場合は例外を投げて何も登録しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, null);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     String otherUsersPhoto =
         "fa92b95a-22dd-4309-8f76-e53072d5d04c/records/0b3c9f2a-1234-4abc-9def-0123456789ab.webp";
@@ -197,40 +203,121 @@ class RecordServiceTest {
   }
 
   @Test
-  void 記録の編集_記録を書き換えて写真を入れ直し記録の詳細を返すこと() {
-    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220);
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "少し冷めていた", 3, 250);
+  void 記録の編集_記録を書き換えて写真を入れ直し記録の詳細と外した写真を返すこと() {
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, 3);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "少し冷めていた", 3, 250, 3);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     Item linkedItem = new Item(6L, 2L, "からあげ棒", 4L, false); // 商品は変わらない
     Shop shop = new Shop(2L, "セブンイレブン", 20L, 1L, false);
-    FoodRecord updated = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "少し冷めていた", 3, 250);
+    FoodRecord updated = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "少し冷めていた", 3, 250, 4);
     when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord); // 最初の確認（行ロック）
     when(repository.searchRecord(2L)).thenReturn(updated); // 最後の取り直し
     when(shopService.searchShopToLink(2L)).thenReturn(shop);
     when(itemService.registerItem(item)).thenReturn(linkedItem);
-    when(repository.searchRecordPhotoPaths(2L)).thenReturn(List.of(PHOTO_2, PHOTO_1));
+    when(repository.updateRecord(any())).thenReturn(1); // 版が同じなので 1 件更新される
+    // 保存の前は PHOTO_1・PHOTO_3、保存の後は PHOTO_2・PHOTO_1（PHOTO_3 を外し、PHOTO_2 を足して並べかえた）
+    when(repository.searchRecordPhotoPaths(2L)).thenReturn(List.of(PHOTO_1, PHOTO_3),
+        List.of(PHOTO_2, PHOTO_1));
     FoodRecord expectedArgument =
-        new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "少し冷めていた", 3, 250);
-    RecordDetail expected = new RecordDetail(updated, linkedItem, shop, List.of(PHOTO_2, PHOTO_1));
+        new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "少し冷めていた", 3, 250, 3);
+    RecordUpdateResult expected = new RecordUpdateResult(
+        new RecordDetail(updated, linkedItem, shop, List.of(PHOTO_2, PHOTO_1)), List.of(PHOTO_3));
 
-    RecordDetail actual = sut.updateRecord(2L, input, item, List.of(PHOTO_2, PHOTO_1));
+    RecordUpdateResult actual = sut.updateRecord(2L, input, item, List.of(PHOTO_2, PHOTO_1));
 
     assertThat(actual).isEqualTo(expected);
-    verify(repository).updateRecord(expectedArgument);
+    verify(repository).updateRecord(expectedArgument); // 画面が見た版（3）で更新を頼む
     InOrder photos = inOrder(repository);
-    photos.verify(repository).deleteRecordPhotos(2L); // 全部消してから
+    photos.verify(repository).updateRecord(any()); // 版の確認と更新が先
+    photos.verify(repository).searchRecordPhotoPaths(2L); // 保存の前の写真を読んでから
+    photos.verify(repository).deleteRecordPhotos(2L); // 全部消して
     photos.verify(repository).insertRecordPhotos(2L, List.of(PHOTO_2, PHOTO_1)); // 送られた順に入れ直す
     verify(itemService, never()).deleteItemIfNoRecords(any()); // 付け替えていないので消さない
     assertThat(input.getId()).isNull(); // 受け取った引数は変更しないこと
   }
 
   @Test
-  void 記録の編集_別の商品に付け替えた場合は前の商品の後始末をすること() {
-    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 7L, EATEN_ON, null, null, 4, null);
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+  void 記録の編集_読んだ版と画面の版が違う場合は商品を作る前に409用の例外を投げて何も変更しないこと() {
+    // DB の今の版は 4、画面が開いたときの版は 3（ほかの画面で先に保存された）
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 7L, EATEN_ON, null, null, 4, null, 4);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "古い画面から", 4, null, 3);
+    Item item = new Item(null, 2L, "からあげ棒", 4L, false);
+    when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
+
+    assertThatThrownBy(() -> sut.updateRecord(2L, input, item, List.of(PHOTO_1)))
+        .isInstanceOf(RecordVersionConflictException.class)
+        .hasMessage("ほかの画面で先に保存されています。\n詳細画面を開き直してから、もう一度編集してください。");
+
+    // 版を比べた所で止まり、店・分類の確認、商品の登録、更新、写真の変更へ進まないこと
+    verify(shopService, never()).searchShopToLink(any());
+    verify(categoryService, never()).searchCategory(any());
+    verify(itemService, never()).registerItem(any());
+    verify(repository, never()).updateRecord(any());
+    verify(repository, never()).searchRecordPhotoPaths(any());
+    verify(repository, never()).deleteRecordPhotos(any());
+    verify(repository, never()).insertRecordPhotos(any(), any());
+    verify(itemService, never()).deleteItemIfNoRecords(any());
+  }
+
+  @Test
+  void 記録の編集_版が古く店も存在しない場合は400用ではなく409用の例外になること() {
+    // 本人確認のあとは、店などの確認より先に版を比べる（古い画面からの要求だと先に伝える）
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 7L, EATEN_ON, null, null, 4, null, 4);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, 3);
+    Item itemOfMissingShop = new Item(null, 999L, "からあげ棒", 4L, false); // 店 999 は存在しない
+    when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
+
+    assertThatThrownBy(() -> sut.updateRecord(2L, input, itemOfMissingShop, List.of()))
+        .isInstanceOf(RecordVersionConflictException.class);
+
+    verify(shopService, never()).searchShopToLink(any()); // 店の確認まで進まない
+  }
+
+  @Test
+  void 記録の編集_Repositoryが更新できなかった場合は409用の例外を投げて写真の変更と商品の後始末へ進まないこと() {
+    // 版は同じなので、Service の比較は通る。Repository だけが 0 件（更新できなかった）と返す場合
+    // （今の処理ではロック中なので起きないが、Repository が更新できなかったと報告したら、後の処理を止める約束を確かめる）
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 7L, EATEN_ON, null, null, 4, null, 3);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, "画面から", 4, null, 3);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
     when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
+    when(repository.updateRecord(any())).thenReturn(0);
+
+    assertThatThrownBy(() -> sut.updateRecord(2L, input, item, List.of(PHOTO_1)))
+        .isInstanceOf(RecordVersionConflictException.class)
+        .hasMessage("ほかの画面で先に保存されています。\n詳細画面を開き直してから、もう一度編集してください。");
+
+    verify(repository, never()).searchRecordPhotoPaths(any());
+    verify(repository, never()).deleteRecordPhotos(any());
+    verify(repository, never()).insertRecordPhotos(any(), any());
+    // 商品は 7 から 6 に付け替わる内容だが、更新できなかったので、前の商品（7）の後始末もしない
+    verify(itemService, never()).deleteItemIfNoRecords(any());
+  }
+
+  @Test
+  void 記録の編集_写真を変えなければ外した写真は空であること() {
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, null, 4, null, 0);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 5, null, 0);
+    Item item = new Item(null, 2L, "からあげ棒", 4L, false);
+    when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
+    when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
+    when(repository.updateRecord(any())).thenReturn(1);
+    when(repository.searchRecordPhotoPaths(2L)).thenReturn(List.of(PHOTO_1, PHOTO_2));
+
+    RecordUpdateResult actual = sut.updateRecord(2L, input, item, List.of(PHOTO_2, PHOTO_1));
+
+    assertThat(actual.getRemovedPhotoPaths()).isEmpty(); // 並べかえただけなので、外した写真はない
+  }
+
+  @Test
+  void 記録の編集_別の商品に付け替えた場合は前の商品の後始末をすること() {
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 7L, EATEN_ON, null, null, 4, null, 0);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, 0);
+    Item item = new Item(null, 2L, "からあげ棒", 4L, false);
+    when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
+    when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
+    when(repository.updateRecord(any())).thenReturn(1);
 
     sut.updateRecord(2L, input, item, List.of());
 
@@ -239,11 +326,12 @@ class RecordServiceTest {
 
   @Test
   void 記録の編集_写真をすべて外した場合は写真を消すだけで入れ直さないこと() {
-    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, null, 4, null);
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord myRecord = new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, null, 4, null, 0);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, 0);
     Item item = new Item(null, 2L, "からあげ棒", 4L, false);
     when(repository.searchRecordForUpdate(2L)).thenReturn(myRecord);
     when(itemService.registerItem(item)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
+    when(repository.updateRecord(any())).thenReturn(1);
 
     sut.updateRecord(2L, input, item, List.of());
 
@@ -253,7 +341,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の編集_記録が見つからない場合は404用の例外を投げて何も変更しないこと() {
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 4, null, 0);
     when(repository.searchRecordForUpdate(999L)).thenReturn(null);
 
     assertThatThrownBy(
@@ -266,8 +354,9 @@ class RecordServiceTest {
 
   @Test
   void 記録の編集_他人の記録の場合は403用の例外を投げて何も変更しないこと() {
-    FoodRecord othersRecord = new FoodRecord(3L, OTHER_USER_ID, 5L, EATEN_ON, null, null, 3, null);
-    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 1, null);
+    FoodRecord othersRecord =
+        new FoodRecord(3L, OTHER_USER_ID, 5L, EATEN_ON, null, null, 3, null, 0);
+    FoodRecord input = new FoodRecord(null, USER_ID, null, EATEN_ON, null, null, 1, null, 0);
     when(repository.searchRecordForUpdate(3L)).thenReturn(othersRecord);
 
     assertThatThrownBy(
@@ -282,7 +371,7 @@ class RecordServiceTest {
 
   @Test
   void 記録の削除_写真のパスを読んでから記録を削除し商品の後始末をすること() {
-    FoodRecord myRecord = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null);
+    FoodRecord myRecord = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, null, 4, null, 0);
     when(repository.searchRecordForUpdate(1L)).thenReturn(myRecord);
     when(repository.searchRecordPhotoPaths(1L)).thenReturn(List.of(PHOTO_1, PHOTO_2));
 
@@ -308,7 +397,7 @@ class RecordServiceTest {
   @Test
   void 記録の削除_他人の記録の場合は403用の例外を投げて何も削除しないこと() {
     when(repository.searchRecordForUpdate(3L))
-        .thenReturn(new FoodRecord(3L, OTHER_USER_ID, 5L, EATEN_ON, null, null, 3, null));
+        .thenReturn(new FoodRecord(3L, OTHER_USER_ID, 5L, EATEN_ON, null, null, 3, null, 0));
 
     assertThatThrownBy(() -> sut.deleteRecord(3L, USER_ID)).isInstanceOf(ForbiddenException.class)
         .hasMessage("この記録を変更する権限がありません。id=3");

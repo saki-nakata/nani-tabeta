@@ -72,10 +72,13 @@ export function ShopPicker({
 
   // 店を選んだあとは、選んだ店と「変更」ボタンだけを表示する
   if (selectedShop) {
-    const shopKind =
-      selectedShop.type === "new"
-        ? shopKinds.find((kind) => kind.id === selectedShop.shopKindId)
-        : undefined;
+    // 業態の ID（登録済みの店は店の業態、新しい店は「新しい店」の欄で選んだ業態）
+    const shopKindId =
+      selectedShop.type === "registered"
+        ? selectedShop.shop.shopKindId
+        : selectedShop.shopKindId;
+    const shopKind = shopKinds.find((kind) => kind.id === shopKindId);
+
     return (
       <div className="flex flex-col gap-2">
         <Label>店</Label>

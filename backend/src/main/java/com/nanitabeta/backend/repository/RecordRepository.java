@@ -95,11 +95,13 @@ public interface RecordRepository {
   /**
    * 記録を更新します。
    * <p>
-   * 記録した人（user_id）は変更しません。
+   * 記録した人（user_id）は変更しません。指定した ID と版（version）に一致する記録だけを更新し、版を 1 増やします。 呼び出し元で版を比べていても、この SQL
+   * 自身も版の一致を条件にして更新します。
    *
-   * @param record 更新する記録
+   * @param record 更新する記録（version は、編集画面が読んだときの版）
+   * @return 更新した件数（指定した ID と版に一致する記録を更新した場合は 1、一致する記録がない場合は 0）
    */
-  void updateRecord(FoodRecord record);
+  int updateRecord(FoodRecord record);
 
   /**
    * 記録を削除します。

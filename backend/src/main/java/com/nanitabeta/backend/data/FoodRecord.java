@@ -43,4 +43,9 @@ public class FoodRecord {
 
   @Schema(description = "価格（円）", example = "220")
   private Integer price;
+
+  @Schema(description = "版（編集を保存するたびに 1 増える。編集の保存のときに送り返す）", example = "3",
+      requiredMode = Schema.RequiredMode.REQUIRED)
+  private Integer version;
+
 }

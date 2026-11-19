@@ -2,13 +2,13 @@ import Link from "next/link";
 import { RecordGrid } from "@/components/record-grid";
 import { Button } from "@/components/ui/button";
 import type { Category } from "@/types/master";
-import type { RecordListItem } from "@/types/record";
+import type { RecordCardData } from "@/types/record";
 
 type TodayRecordsProps = {
   // 表示する今日の日付（例："11月3日(火)"）
   dateLabel: string;
   // 今日食べた記録（読んだ分）
-  items: RecordListItem[];
+  cards: RecordCardData[];
   // 続きがあるか（今日の記録が 20 件をこえたとき）
   hasMore: boolean;
   isLoading: boolean;
@@ -22,13 +22,15 @@ type TodayRecordsProps = {
   onLoadMore: () => void;
   // 「もう一度読む」を押したとき
   onRetry: () => void;
+  // 記録を削除したとき（その記録のカードを、この欄から消す）
+  onDeleted: (recordId: number) => void;
 };
 
 // 一覧のいちばん上の「今日」の欄。0 件なら、絞り込みなしは記録をうながし、絞り込みありは条件に合わないと出す
 // 続きは、無限スクロールではなく「今日の記録をもっと見る」のボタンで読む（下の「これまで」の欄と、読みこみが重ならないように）
 export function TodayRecords({
   dateLabel,
-  items,
+  cards,
   hasMore,
   isLoading,
   errorMessage,
@@ -36,10 +38,11 @@ export function TodayRecords({
   categories,
   onLoadMore,
   onRetry,
+  onDeleted,
 }: TodayRecordsProps) {
   // 読み終わって 1 件もない（読み込み中・失敗は、0 件とは別に出す）
   const isEmpty =
-    items.length === 0 && !hasMore && !isLoading && errorMessage === null;
+    cards.length === 0 && !hasMore && !isLoading && errorMessage === null;
 
   return (
     <section className="flex flex-col gap-3">
@@ -51,7 +54,13 @@ export function TodayRecords({
         <span className="text-xs text-muted-foreground">{dateLabel}</span>
       </div>
 
-      {items.length > 0 && <RecordGrid items={items} categories={categories} />}
+      {cards.length > 0 && (
+        <RecordGrid
+          cards={cards}
+          categories={categories}
+          onDeleted={onDeleted}
+        />
+      )}
 
       {isEmpty &&
         (isFiltered ? (

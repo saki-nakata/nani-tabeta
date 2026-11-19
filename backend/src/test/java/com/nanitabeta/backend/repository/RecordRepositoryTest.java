@@ -28,7 +28,7 @@ class RecordRepositoryTest {
   @Sql("/sql/insert-record.sql")
   void 記録を1件取得できること() {
     FoodRecord expected =
-        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220);
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220, 0);
 
     FoodRecord actual = sut.searchRecord(1L);
 
@@ -46,13 +46,13 @@ class RecordRepositoryTest {
   @Sql("/sql/insert-record.sql")
   void 記録を登録できること() {
     FoodRecord record =
-        new FoodRecord(null, USER_ID, 1L, LocalDate.of(2026, 9, 26), null, null, 5, null);
+        new FoodRecord(null, USER_ID, 1L, LocalDate.of(2026, 9, 26), null, null, 5, null, 0);
 
     sut.insertRecord(record);
 
     assertThat(record.getId()).isNotNull(); // 採番された ID が書き戻されること
-    FoodRecord expected =
-        new FoodRecord(record.getId(), USER_ID, 1L, LocalDate.of(2026, 9, 26), null, null, 5, null);
+    FoodRecord expected = new FoodRecord(record.getId(), USER_ID, 1L, LocalDate.of(2026, 9, 26),
+        null, null, 5, null, 0);
     FoodRecord actual = sut.searchRecord(record.getId());
     assertThat(actual).isEqualTo(expected);
   }
@@ -77,7 +77,7 @@ class RecordRepositoryTest {
   @Sql("/sql/insert-record.sql")
   void 写真をまとめて登録するとリストの順番が並び順になること() {
     FoodRecord record =
-        new FoodRecord(null, USER_ID, 1L, LocalDate.of(2026, 9, 26), null, null, 5, null);
+        new FoodRecord(null, USER_ID, 1L, LocalDate.of(2026, 9, 26), null, null, 5, null, 0);
     sut.insertRecord(record);
     List<String> expected = List.of(USER_ID + "/records/a.webp", USER_ID + "/records/b.webp",
         USER_ID + "/records/c.webp");
@@ -90,17 +90,35 @@ class RecordRepositoryTest {
 
   @Test
   @Sql("/sql/insert-record.sql")
-  void 記録を更新できること_記録した人は変わらないこと() {
+  void 記録を更新できること_記録した人は変わらず版が1増えること() {
     // 本文に別のユーザーIDを入れても、SQL で user_id を更新しないので変わらない
     FoodRecord record = new FoodRecord(1L, "fa92b95a-22dd-4309-8f76-e53072d5d04c", 1L,
-        LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250);
+        LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250, 0);
     FoodRecord expected =
-        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250);
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), "氷少なめ", "また食べたい", 5, 250, 1);
 
-    sut.updateRecord(record);
+    int updatedCount = sut.updateRecord(record);
 
+    assertThat(updatedCount).isEqualTo(1);
     FoodRecord actual = sut.searchRecord(1L);
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql("/sql/insert-record.sql")
+  void 記録の更新_版が違う場合は何も更新せず0件を返すこと() {
+    // 今の版は 0。版 0 で 1 回更新すると版 1 になり、そのあと古い版 0 のまま送っても更新されない
+    sut.updateRecord(
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), null, "1回目", 5, null, 0));
+    FoodRecord expected =
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 20), null, "1回目", 5, null, 1);
+
+    int updatedCount = sut.updateRecord(
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 21), null, "古い画面から", 1, null, 0));
+
+    assertThat(updatedCount).isZero();
+    FoodRecord actual = sut.searchRecord(1L);
+    assertThat(actual).isEqualTo(expected); // 1 回目の内容のまま、版も 1 のまま
   }
 
   @Test
@@ -126,7 +144,7 @@ class RecordRepositoryTest {
   void 記録を行ロックをかけて1件取得できること() {
     // FOR UPDATE が効いているか（同時操作を防げるか）までは、このテストでは確かめられない
     FoodRecord expected =
-        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220);
+        new FoodRecord(1L, USER_ID, 1L, LocalDate.of(2026, 9, 27), "辛さ多め", "衣がサクサク", 4, 220, 0);
 
     FoodRecord actual = sut.searchRecordForUpdate(1L);
 

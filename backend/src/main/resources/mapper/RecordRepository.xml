@@ -4,14 +4,14 @@
 <mapper namespace="com.nanitabeta.backend.repository.RecordRepository">
   <!-- 記録の1件取得 -->
   <select id="searchRecord" resultType="com.nanitabeta.backend.data.FoodRecord">
-    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price
+    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price, version
     FROM records
     WHERE id = #{id}
   </select>
 
   <!-- 記録の1件取得（編集・削除の前に使う。行ロックをかけ、最新の確定データを読む） -->
   <select id="searchRecordForUpdate" resultType="com.nanitabeta.backend.data.FoodRecord">
-    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price
+    SELECT id, user_id, item_id, eaten_on, custom_note, review, rating, price, version
     FROM records
     WHERE id = #{id}
     FOR UPDATE
@@ -40,7 +40,9 @@
     </foreach>
   </insert>
 
-  <!-- 記録の更新（記録した人は変えない） -->
+  <!-- 記録の更新（記録した人は変えない）
+       指定された ID と版（version）に一致する記録だけを更新し、版を 1 増やす。一致する記録がなければ 0 件を返す。
+       Service でも商品の登録の前に版を比べるが、この SQL 自身も版の一致を条件にして更新する -->
   <update id="updateRecord">
     UPDATE records
     SET item_id = #{itemId},
@@ -48,8 +50,10 @@
         custom_note = #{customNote},
         review = #{review},
         rating = #{rating},
-        price = #{price}
+        price = #{price},
+        version = version + 1
     WHERE id = #{id}
+      AND version = #{version}
   </update>
 
   <!-- 記録の削除（写真・いいね・コメントは ON DELETE CASCADE で一緒に消える） -->
