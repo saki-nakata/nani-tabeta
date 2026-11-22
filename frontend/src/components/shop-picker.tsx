@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import type { ShopKind } from "@/types/master";
 import type { Shop } from "@/types/shop";
 import { normalizeName } from "@/lib/name-normalizer";
+import { TwemojiImage } from "@/components/twemoji-image";
 
 // 選んだ店：登録済みの店か、記録するときに登録する新しい店の予定か
 export type SelectedShop =
@@ -96,7 +97,9 @@ export function ShopPicker({
             </span>
             {shopKind && (
               <span className="text-xs text-muted-foreground">
-                業態：{shopKind.shopKindEmoji} {shopKind.shopKindName}
+                業態：
+                <TwemojiImage emoji={shopKind.shopKindEmoji} />{" "}
+                {shopKind.shopKindName}
               </span>
             )}
           </div>

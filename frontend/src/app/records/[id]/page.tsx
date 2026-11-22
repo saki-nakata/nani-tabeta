@@ -8,6 +8,7 @@ import { PhotoGallery } from "@/components/photo-gallery";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { TwemojiImage } from "@/components/twemoji-image";
 
 // 食べた日を「2026年10月17日」の形にする（"2026-10-17" の文字を分けて組み立てる）
 function formatEatenOn(eatenOn: string) {
@@ -80,7 +81,8 @@ export default async function RecordPage({
             <div className="flex flex-wrap gap-2">
               {category && (
                 <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs">
-                  {category.categoryEmoji} {category.categoryName}
+                  <TwemojiImage emoji={category.categoryEmoji} />{" "}
+                  {category.categoryName}
                 </span>
               )}
               {item.isSeasonal && (

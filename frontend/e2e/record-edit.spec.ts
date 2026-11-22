@@ -83,6 +83,10 @@ test("記録を編集して保存すると、詳細に変更が出て、読み�
   await page.keyboard.press("Space");
   // 位置を測り終えると、今いる場所（自分の位置）を知らせる
   await expect(dragStatus).toHaveText("2枚目の位置です。");
+  // dnd-kit は、つかんだあと setTimeout（次の順番）で矢印キーの受け付けを始める（KeyboardSensor の attach）。
+  // 上の知らせはそれより先に出ることがあるので、こちらも setTimeout を 1 回待ち、受け付けが始まったあとに押す
+  // （時間で待つのではなく、先に予約された dnd-kit の setTimeout が、必ず先に動くことを使う）
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
   await page.keyboard.press("ArrowLeft");
   await expect(dragStatus).toHaveText("1枚目の位置です。");
   await page.keyboard.press("Space");
