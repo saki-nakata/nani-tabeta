@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { Category, ShopKind } from "@/types/master";
 import type { RecordListFilter } from "@/types/record";
 import { Fragment, type ReactNode } from "react";
+import { TwemojiImage } from "@/components/twemoji-image";
 
 type RecordFiltersProps = {
   // 今選んでいる絞り込み
@@ -124,7 +125,7 @@ function EmojiButton({
             isSelected && EMOJI_BUTTON_STYLES[filterType].selected,
           )}
         >
-          {emoji}
+          <TwemojiImage emoji={emoji} />
         </span>
         <span
           className={cn(

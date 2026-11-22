@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { RecordCardData } from "@/types/record";
+import { TwemojiImage } from "@/components/twemoji-image";
 
 type RecordCardProps = {
   card: RecordCardData;
@@ -41,7 +42,7 @@ export function RecordCard({ card, categoryEmoji }: RecordCardProps) {
           aria-hidden="true"
           className="absolute inset-0 grid place-items-center text-4xl"
         >
-          {categoryEmoji}
+          <TwemojiImage emoji={categoryEmoji} />
         </span>
       )}
 

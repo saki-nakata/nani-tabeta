@@ -36,6 +36,7 @@
 | 認証 | Supabase Auth（Google OAuth）。サーバー側は Spring Security で JWT を検証 |
 | ファイル保存 | Supabase Storage（記録の写真） |
 | 読みの取得 | Sudachi 0.8.2＋SudachiDict core（ひらがなで漢字の店名・商品名を探す） |
+| 絵文字 | Twemoji v17.0.3（分類・業態の絵文字を、どの端末でも同じ絵で出す。画像は同梱）/ `@twemoji/api` 17.0.3 |
 | テスト | Vitest・Testing Library（フロントエンド）/ JUnit・Spring Boot Test（バックエンド）/ Playwright（E2E） |
 | 整形 | Prettier（フロントエンド）/ Spotless（バックエンド） |
 
@@ -329,6 +330,10 @@ SQL は `IF NOT EXISTS` 付きなので、何度実行しても問題ありま�
 ```powershell
 Stop-Service MySQL80
 ```
+
+## 使っている素材
+
+- 絵文字：[Twemoji](https://github.com/jdecked/twemoji)（画像は [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)）。v17.0.3 の SVG を `frontend/public/twemoji/17.0.3/` に同梱しています（取得元・版を上げる手順は、そのフォルダの `README.md`）
 
 ## ドキュメント
 

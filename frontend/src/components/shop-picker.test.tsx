@@ -37,6 +37,15 @@ function renderPicker(
   );
 }
 
+// 「業態：」の行に、業態の Twemoji の画像（ファイル名）と、業態の名前が出ていること
+function expectShopKind(twemojiFileName: string, shopKindName: string) {
+  const line = screen.getByText(/業態：/);
+  expect(line.textContent).toBe(`業態： ${shopKindName}`);
+  expect(line.querySelector("img")?.getAttribute("src")).toBe(
+    `/twemoji/17.0.3/${twemojiFileName}.svg`,
+  );
+}
+
 beforeEach(() => {
   suggestShops.mockResolvedValue([]);
 });
@@ -51,7 +60,7 @@ describe("ShopPicker（店を選んだあと）", () => {
     renderPicker({ type: "registered", shop: starbucks });
 
     expect(screen.getByText("スタバ")).toBeDefined();
-    expect(screen.getByText("業態：☕ カフェ")).toBeDefined();
+    expectShopKind("2615", "カフェ");
     // 登録済みの店には「（新しい店）」を付けない
     expect(screen.queryByText("（新しい店）")).toBeNull();
   });
@@ -61,7 +70,7 @@ describe("ShopPicker（店を選んだあと）", () => {
 
     expect(screen.getByText("ローソン")).toBeDefined();
     expect(screen.getByText("（新しい店）")).toBeDefined();
-    expect(screen.getByText("業態：🏪 コンビニ")).toBeDefined();
+    expectShopKind("1f3ea", "コンビニ");
   });
 
   test("店の業態が業態の一覧になければ、業態の行は出さず、店名だけを出すこと", () => {

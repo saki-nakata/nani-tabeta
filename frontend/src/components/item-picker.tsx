@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import type { Item } from "@/types/item";
 import type { Category } from "@/types/master";
 import { normalizeName } from "@/lib/name-normalizer";
+import { TwemojiImage } from "@/components/twemoji-image";
 
 // 入力中の商品（候補にないときは、記録するときに新しい商品として登録する）
 export type NewItem = {
@@ -92,7 +93,9 @@ export function ItemPicker({
             <span>{selectedItem.itemName}</span>
             {category && (
               <span className="text-xs text-muted-foreground">
-                分類：{category.categoryEmoji} {category.categoryName}
+                分類：
+                <TwemojiImage emoji={category.categoryEmoji} />{" "}
+                {category.categoryName}
                 {selectedItem.isSeasonal && "・季節限定"}
               </span>
             )}

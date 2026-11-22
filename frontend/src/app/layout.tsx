@@ -4,6 +4,7 @@ import {
   Shippori_Mincho,
   Zen_Kaku_Gothic_New,
 } from "next/font/google";
+import { AppFooter } from "@/components/app-footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           disableTransitionOnChange
         >
           {children}
+          <AppFooter />
         </ThemeProvider>
       </body>
     </html>
