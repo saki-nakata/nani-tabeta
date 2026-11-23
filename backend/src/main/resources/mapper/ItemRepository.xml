@@ -40,6 +40,29 @@
     ORDER BY item_name, id
   </select>
 
+  <!-- 店の商品の候補（キーワードがないとき。だれかの記録がある商品だけ）
+       自分の記録が多い商品 → 同じなら最後に食べた日が新しい商品 → 商品名 → ID の順。自分の記録がない商品は、そのうしろに商品名 → ID の順
+       my_item_records：自分の記録を商品ごとにまとめたもの（1 行が 1 つの商品。record_count＝件数、last_eaten_on＝最後に食べた日） -->
+  <select id="searchItemSuggestionsByMyRecords" resultType="com.nanitabeta.backend.data.Item">
+    SELECT items.id, items.shop_id, items.item_name, items.category_id, items.is_seasonal
+    FROM items
+    LEFT JOIN (
+      SELECT records.item_id,
+             COUNT(*) AS record_count,
+             MAX(records.eaten_on) AS last_eaten_on
+      FROM records
+      WHERE records.user_id = #{userId}
+      GROUP BY records.item_id
+    ) AS my_item_records ON my_item_records.item_id = items.id
+    WHERE items.shop_id = #{shopId}
+      AND EXISTS (SELECT 1 FROM records WHERE records.item_id = items.id)
+    ORDER BY COALESCE(my_item_records.record_count, 0) DESC,
+             my_item_records.last_eaten_on DESC,
+             items.item_name,
+             items.id
+    LIMIT #{limit}
+  </select>
+
   <!-- 店と商品名で商品を取得（商品名は LOWER 一致。大文字小文字だけが違う商品も同じ商品とする） -->
   <select id="searchItemByShopAndName" resultType="com.nanitabeta.backend.data.Item">
     SELECT id, shop_id, item_name, category_id, is_seasonal

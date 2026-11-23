@@ -131,27 +131,32 @@ public class ShopService {
   /**
    * 店の登録時に表示する候補を取得します。
    * <p>
-   * 閉店した店は候補に出しません。まず店名で探します（キーワードを含む店。LOWER 一致の店名を先頭に、残りは店名順）。
+   * 閉店した店は候補に出しません。キーワードがない場合（null・空文字・スペースだけ）は、ログイン中の利用者がよく使う順に並べます
+   * （自分の記録が多い店、同じなら最後に食べた日が新しい店、そのあとは店名順。自分の記録がない店はうしろに店名順）。
+   * <p>
+   * キーワードがある場合は、まず店名で探します（キーワードを含む店。LOWER 一致の店名を先頭に、残りは店名順）。
    * 件数の上限に足りない場合は、読みがキーワードに当たる店を、店名順にうしろへ足します （「まつや」で「松屋」、「starbucks」で「スターバックス」を見つけるため）。
    * 店名で上限まで見つかった場合は、読みでは探しません。
    *
+   * @param userId 利用者のID（JWT の sub。キーワードがない場合の並びに使う）
    * @param areaId エリアID
-   * @param keyword 店名の一部（null または空文字の場合は絞り込まない）
+   * @param keyword 店名の一部（null・空文字・スペースだけの場合は絞り込まず、よく使う順に並べる）
    * @return 店の一覧（該当がない場合は空のリスト）
    */
-  public List<Shop> searchShopSuggestions(Long areaId, String keyword) {
+  public List<Shop> searchShopSuggestions(String userId, Long areaId, String keyword) {
     areaService.searchArea(areaId); // 存在しない場合は InvalidAreaException
-    String sameKeyword = null; // 完全一致・かなと大文字小文字の違いを吸収した一致用（先頭に並べる）
-    String likeKeyword = null; // 部分一致用
-    if (keyword != null) {
-      sameKeyword = NameNormalizer.normalize(keyword);
-      likeKeyword = LikeEscaper.escape(sameKeyword);
+    // 完全一致・かなと大文字小文字の違いを吸収した一致用（先頭に並べる）
+    String sameKeyword = keyword == null ? null : NameNormalizer.normalize(keyword);
+    // キーワードがない（未指定・空文字・スペースだけ）ときは、自分の記録で並べる
+    if (sameKeyword == null || sameKeyword.isEmpty()) {
+      return repository.searchShopSuggestionsByMyRecords(areaId, userId, SUGGESTION_LIMIT);
     }
+    String likeKeyword = LikeEscaper.escape(sameKeyword); // 部分一致用
     List<Shop> suggestions =
         repository.searchShopSuggestions(areaId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
 
-    // 店名で上限まで見つかった、またはキーワードがない場合は、読みでは探さない
-    if (keyword == null || suggestions.size() >= SUGGESTION_LIMIT) {
+    // 店名で上限まで見つかった場合は、読みでは探さない
+    if (suggestions.size() >= SUGGESTION_LIMIT) {
       return suggestions;
     }
     // 読みと比べる形は、LIKE のエスケープ前のキーワードから作る（% や _ を普通の文字として比べるため）

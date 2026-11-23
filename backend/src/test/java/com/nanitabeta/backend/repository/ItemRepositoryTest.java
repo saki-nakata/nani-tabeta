@@ -16,6 +16,9 @@ import org.springframework.test.context.jdbc.Sql;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class ItemRepositoryTest {
 
+  // よく使う順の候補で、記録を数える利用者（テストデータの Saki）
+  private static final String MY_USER_ID = "20b622c8-dd31-46e8-8f1a-64009c7febe5";
+
   @Autowired
   private ItemRepository sut;
 
@@ -423,5 +426,110 @@ class ItemRepositoryTest {
     sut.deleteItemIfNoRecords(1L);
 
     assertThat(sut.searchItem(1L)).isEqualTo(expected);
+  }
+
+  // ここから、キーワードがないときの商品の候補（よく使う順）。データの並びは insert-items-for-my-records.sql の先頭に書いてある
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_記録の件数_最後に食べた日_商品名の順に並び自分の記録がない商品はうしろに商品名順で並ぶこと() {
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("Z からあげクン", "X おにぎり", "Y プリン",
+        "R サラダ", "S パン", "W 肉まん", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08",
+        "B ほかの人だけの商品");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_商品名順では上限から漏れるよく使う商品も先頭に返すこと() {
+    // テストデータが、今までの候補（商品名順）では Z からあげクン が 10 件に入らない形になっていることの確認
+    List<Item> nameOrder = sut.searchItemSuggestions(1L, null, null, 10);
+    assertThat(nameOrder).extracting(Item::getItemName).doesNotContain("Z からあげクン");
+
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsExactly("Z からあげクン", "X おにぎり", "Y プリン",
+        "R サラダ", "S パン", "W 肉まん", "A01", "A02", "A03", "A04");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_同じ件数なら登録した日時ではなく最後に食べた日が新しい商品を先にすること() {
+    // X おにぎり は食べた日が新しく（11/01）登録した日時が古い。Y プリン は食べた日が古く（10/01）登録した日時が新しい
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsSubsequence("X おにぎり", "Y プリン");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_件数も最後に食べた日も同じなら商品名順に並ぶこと() {
+    // R サラダ と S パン は、どちらも 1 件・09/01。記録を入れた順（S パン が先）ではなく商品名順
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Item::getItemName).containsSubsequence("R サラダ", "S パン");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_ほかの人の記録は件数にも最後に食べた日にも使わないが候補には出すこと() {
+    // W 肉まん は、ほかの人の新しい記録（11/20）を数えると 2 件・11/20 になり、先頭に来てしまう
+    // B ほかの人だけの商品 は、自分の記録はないが、ほかの人の記録があるので候補に出て、最後に並ぶ
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Item::getItemName).containsSubsequence("R サラダ", "S パン", "W 肉まん",
+        "A01");
+    assertThat(actual).last().extracting(Item::getItemName).isEqualTo("B ほかの人だけの商品");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_だれの記録もない商品は出さないこと() {
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Item::getItemName).doesNotContain("N だれも記録していない商品");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_ほかの店の同じ名前の商品は出さず記録も数えないこと() {
+    // 店2の「W 肉まん」は Saki の記録が 4 件。混ざると W 肉まん が先頭に来るか、2 件並ぶ
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Item::getShopId).containsOnly(1L);
+    assertThat(actual).filteredOn(item -> item.getItemName().equals("W 肉まん"))
+        .extracting(Item::getId).containsExactly(4L);
+    assertThat(actual).extracting(Item::getItemName).containsSubsequence("S パン", "W 肉まん");
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_自分の記録がひとつもない場合は今までの候補と同じ商品名順になること() {
+    // 記録を 1 件も持たない利用者
+    String userId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(1L, userId, 10);
+
+    List<Item> expected = sut.searchItemSuggestions(1L, null, null, 10);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_存在しない店IDの場合は空のリストを返すこと() {
+    // 店99は存在しない（存在するかの確認は Service で行う）
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(99L, MY_USER_ID, 10);
+
+    assertThat(actual).isEmpty();
+  }
+
+  @Test
+  @Sql("/sql/insert-items-for-my-records.sql")
+  void よく使う順の商品の候補_商品はあるがだれの記録もない店の場合は空のリストを返すこと() {
+    // 店3には商品が 1 つあるが、だれの記録もない
+    List<Item> actual = sut.searchItemSuggestionsByMyRecords(3L, MY_USER_ID, 10);
+
+    assertThat(actual).isEmpty();
   }
 }

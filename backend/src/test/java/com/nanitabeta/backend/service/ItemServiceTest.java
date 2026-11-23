@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -23,6 +22,9 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +32,9 @@ import org.springframework.dao.DuplicateKeyException;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
+
+  // 候補を探す利用者（JWT の sub）
+  private static final String USER_ID = "20b622c8-dd31-46e8-8f1a-64009c7febe5";
 
   @Mock
   private ItemRepository repository;
@@ -69,7 +74,7 @@ class ItemServiceTest {
     List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
     when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "から");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "から");
 
     assertThat(actual).isEqualTo(expected);
   }
@@ -78,22 +83,34 @@ class ItemServiceTest {
   void 商品の候補_店が存在しない場合は例外を投げて検索しないこと() {
     doThrow(new ResourceNotFoundException("店が見つかりません。id=999")).when(shopService).searchShop(999L);
 
-    assertThatThrownBy(() -> sut.searchItemSuggestions(999L, null))
+    assertThatThrownBy(() -> sut.searchItemSuggestions(USER_ID, 999L, null))
         .isInstanceOf(ResourceNotFoundException.class).hasMessage("店が見つかりません。id=999");
 
     verify(repository, never()).searchItemSuggestions(any(), any(), any(), anyInt());
+    verify(repository, never()).searchItemSuggestionsByMyRecords(any(), any(), anyInt());
+  }
+
+  @Test
+  void 商品の候補_キーワードがあり店が存在しない場合も例外を投げて検索しないこと() {
+    doThrow(new ResourceNotFoundException("店が見つかりません。id=999")).when(shopService).searchShop(999L);
+
+    assertThatThrownBy(() -> sut.searchItemSuggestions(USER_ID, 999L, "から"))
+        .isInstanceOf(ResourceNotFoundException.class).hasMessage("店が見つかりません。id=999");
+
+    verify(repository, never()).searchItemSuggestions(any(), any(), any(), anyInt());
+    verify(repository, never()).searchItemSuggestionsByMyRecords(any(), any(), anyInt());
   }
 
   @Test
   void 商品の候補_キーワードを正規化してから渡すこと() {
-    sut.searchItemSuggestions(1L, "　から　あげ　"); // 前後と途中に全角スペース
+    sut.searchItemSuggestions(USER_ID, 1L, "　から　あげ　"); // 前後と途中に全角スペース
 
     verify(repository).searchItemSuggestions(eq(1L), eq("から あげ"), eq("から あげ"), anyInt());
   }
 
   @Test
   void 商品の候補_部分一致用はワイルドカードとバックスラッシュをエスケープし完全一致用はエスケープしないこと() {
-    sut.searchItemSuggestions(1L, "　100%_\\OFF　");
+    sut.searchItemSuggestions(USER_ID, 1L, "　100%_\\OFF　");
 
     // 部分一致用（LIKE）：100\%\_\\OFF、完全一致用：100%_\OFF（正規化だけ）
     verify(repository).searchItemSuggestions(eq(1L), eq("100\\%\\_\\\\OFF"), eq("100%_\\OFF"),
@@ -102,30 +119,48 @@ class ItemServiceTest {
 
   @Test
   void 商品の候補_件数の上限を10件として渡すこと() {
-    sut.searchItemSuggestions(1L, "から");
+    sut.searchItemSuggestions(USER_ID, 1L, "から");
 
     verify(repository).searchItemSuggestions(eq(1L), eq("から"), eq("から"), eq(10));
   }
 
-  @Test
-  void 商品の候補_キーワードが未指定の場合は部分一致用も完全一致用もnullのまま渡すこと() {
-    sut.searchItemSuggestions(1L, null);
+  // null・空文字・半角スペースだけ・全角スペースだけ・半角と全角のスペースが混ざったもの
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "　", " 　 "})
+  void 商品の候補_キーワードがない場合はよく使う順の候補を利用者IDと上限10件で取得してそのまま返すこと(String keyword) {
+    List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
+    when(repository.searchItemSuggestionsByMyRecords(1L, USER_ID, 10)).thenReturn(expected);
 
-    verify(repository).searchItemSuggestions(eq(1L), isNull(), isNull(), anyInt());
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, keyword);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "　", " 　 "})
+  void 商品の候補_キーワードがない場合は商品名でも読みでも探さないこと(String keyword) {
+    sut.searchItemSuggestions(USER_ID, 1L, keyword);
+
+    verify(repository, never()).searchItemSuggestions(any(), any(), any(), anyInt());
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllItemSuggestions(any());
   }
 
   @Test
-  void 商品の候補_キーワードが空文字の場合は部分一致用も完全一致用も空文字で渡すこと() {
-    sut.searchItemSuggestions(1L, "");
+  void 商品の候補_キーワードがある場合はよく使う順の候補を使わないこと() {
+    sut.searchItemSuggestions(USER_ID, 1L, "から");
 
-    verify(repository).searchItemSuggestions(eq(1L), eq(""), eq(""), anyInt());
+    verify(repository, never()).searchItemSuggestionsByMyRecords(any(), any(), anyInt());
   }
 
   @Test
-  void 商品の候補_キーワードが空白だけの場合は正規化して空文字で渡すこと() {
-    sut.searchItemSuggestions(1L, " 　 ");
+  void 商品の候補_前後にスペースがあるキーワードは空とみなさず商品名で探すこと() {
+    sut.searchItemSuggestions(USER_ID, 1L, "　から ");
 
-    verify(repository).searchItemSuggestions(eq(1L), eq(""), eq(""), anyInt());
+    verify(repository).searchItemSuggestions(eq(1L), eq("から"), eq("から"), anyInt());
+    verify(repository, never()).searchItemSuggestionsByMyRecords(any(), any(), anyInt());
   }
 
   @Test
@@ -133,7 +168,7 @@ class ItemServiceTest {
     List<Item> expected = createItems(1L, 10);
     when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "まっちゃ");
 
     assertThat(actual).isEqualTo(expected);
     verify(nameReadingService, never()).createKeywordForms(any());
@@ -142,20 +177,13 @@ class ItemServiceTest {
   }
 
   @Test
-  void 商品の候補_キーワードが未指定の場合は読みでは探さないこと() {
-    sut.searchItemSuggestions(1L, null);
-
-    verify(nameReadingService, never()).createKeywordForms(any());
-    verify(repository, never()).searchAllItemSuggestions(any());
-  }
-
-  @Test
   void 商品の候補_比べる形がない場合は全部を読み出さないこと() {
     List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
     when(repository.searchItemSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
-    when(nameReadingService.createKeywordForms(" 　 ")).thenReturn(List.of());
+    // 読みと比べる形が作れないキーワード（記号だけなど）
+    when(nameReadingService.createKeywordForms("・")).thenReturn(List.of());
 
-    List<Item> actual = sut.searchItemSuggestions(1L, " 　 ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "・");
 
     assertThat(actual).isEqualTo(expected);
     verify(repository, never()).searchAllItemSuggestions(any());
@@ -166,7 +194,7 @@ class ItemServiceTest {
   void 商品の候補_比べる形はエスケープも正規化もしていない入力から作ること() {
     when(nameReadingService.createKeywordForms(any())).thenReturn(List.of());
 
-    sut.searchItemSuggestions(1L, "　100%_\\OFF　");
+    sut.searchItemSuggestions(USER_ID, 1L, "　100%_\\OFF　");
 
     verify(nameReadingService).createKeywordForms("　100%_\\OFF　");
   }
@@ -182,7 +210,7 @@ class ItemServiceTest {
         .thenReturn(List.of(hojichaLatte, coffee, matchaLatte));
     stubMatchingNames(Set.of("ほうじ茶ラテ", "抹茶ラテ"));
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "らて");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "らて");
 
     List<Item> expected = List.of(hojichaLatte, matchaLatte);
     assertThat(actual).isEqualTo(expected);
@@ -203,7 +231,7 @@ class ItemServiceTest {
     when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(coffee));
     stubMatchingNames(Set.of()); // どの名前も読みで当たらない
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "ラテ");
 
     List<Item> expected = List.of(latte, matchaLatte);
     assertThat(actual).isEqualTo(expected);
@@ -220,7 +248,7 @@ class ItemServiceTest {
     when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(hojichaLatte));
     stubMatchingNames(Set.of("ほうじ茶ラテ"));
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "ラテ");
 
     List<Item> expected = List.of(latte, matchaLatte, hojichaLatte);
     assertThat(actual).isEqualTo(expected);
@@ -239,7 +267,7 @@ class ItemServiceTest {
     when(repository.searchAllItemSuggestions(1L)).thenReturn(List.of(matchaLatte, sameIdLatte));
     stubMatchingNames(Set.of("ラテ", "らて", "抹茶ラテ"));
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "ラテ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "ラテ");
 
     List<Item> expected = List.of(latte, matchaLatte);
     assertThat(actual).isEqualTo(expected);
@@ -257,7 +285,7 @@ class ItemServiceTest {
     when(repository.searchAllItemSuggestions(1L)).thenReturn(readingMatches);
     when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "まっちゃ");
 
     List<Item> expected = new ArrayList<>(nameMatches);
     expected.add(readingMatches.get(0));
@@ -272,7 +300,7 @@ class ItemServiceTest {
     when(repository.searchAllItemSuggestions(1L)).thenReturn(readingMatches);
     when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
 
-    List<Item> actual = sut.searchItemSuggestions(1L, "まっちゃ");
+    List<Item> actual = sut.searchItemSuggestions(USER_ID, 1L, "まっちゃ");
 
     List<Item> expected = readingMatches.subList(0, 10);
     assertThat(actual).isEqualTo(expected);

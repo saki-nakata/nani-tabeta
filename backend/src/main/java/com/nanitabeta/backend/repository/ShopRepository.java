@@ -91,4 +91,18 @@ public interface ShopRepository {
    * @return 店の一覧（該当がない場合は空のリスト）
    */
   List<Shop> searchAllShopSuggestions(Long areaId);
+
+  /**
+   * キーワードがないときの、エリア内の店の候補を取得します（よく使う順）。
+   * <p>
+   * 閉店した店は含みません。自分の記録が多い店、同じなら最後に食べた日（eaten_on）が新しい店を先にし、
+   * そのあとは店名順、同じ店名は店ID順です。自分の記録がない店は、記録がある店のうしろに店名順で並びます。 件数と最後に食べた日には、ほかの利用者の記録を含めません。
+   *
+   * @param areaId エリアID
+   * @param userId 利用者のID（JWT の sub）
+   * @param limit 取得する最大件数
+   * @return 店の一覧（該当がない場合は空のリスト）
+   */
+  List<Shop> searchShopSuggestionsByMyRecords(@Param("areaId") Long areaId,
+      @Param("userId") String userId, @Param("limit") int limit);
 }

@@ -16,6 +16,9 @@ import org.springframework.test.context.jdbc.Sql;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class ShopRepositoryTest {
 
+  // よく使う順の候補で、記録を数える利用者（テストデータの Saki）
+  private static final String MY_USER_ID = "20b622c8-dd31-46e8-8f1a-64009c7febe5";
+
   @Autowired
   private ShopRepository sut;
 
@@ -401,6 +404,107 @@ class ShopRepositoryTest {
   @Sql("/sql/insert-shops-for-suggestions.sql")
   void 候補になりうる店_店がないエリアの場合は空のリストを返すこと() {
     List<Shop> actual = sut.searchAllShopSuggestions(99L);
+
+    assertThat(actual).isEmpty();
+  }
+
+  // ここから、キーワードがないときの店の候補（よく使う順）。データの並びは insert-shops-for-my-records.sql の先頭に書いてある
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_記録の件数_最後に食べた日_店名の順に並び自分の記録がない店はうしろに店名順で並ぶこと() {
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("Z ローソン", "X ドトール", "Y スタバ",
+        "R なか卯", "S すき家", "W 松屋", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08",
+        "B ほかの人だけの店");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_店名順では上限から漏れるよく使う店も先頭に返すこと() {
+    // テストデータが、今までの候補（店名順）では Z ローソン が 10 件に入らない形になっていることの確認
+    List<Shop> nameOrder = sut.searchShopSuggestions(20L, null, null, 10);
+    assertThat(nameOrder).extracting(Shop::getShopName).doesNotContain("Z ローソン");
+
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsExactly("Z ローソン", "X ドトール", "Y スタバ",
+        "R なか卯", "S すき家", "W 松屋", "A01", "A02", "A03", "A04");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_同じ店の複数の商品の記録を合算して数えること() {
+    // Z ローソン は 2 つの商品で 2 件＋1 件。合算しないと X ドトール（2 件）と並び、最後に食べた日が古い Z ローソン がうしろになる
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Shop::getShopName).startsWith("Z ローソン", "X ドトール");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_同じ件数なら登録した日時ではなく最後に食べた日が新しい店を先にすること() {
+    // X ドトール は食べた日が新しく（11/01）登録した日時が古い。Y スタバ は食べた日が古く（10/01）登録した日時が新しい
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsSubsequence("X ドトール", "Y スタバ");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_件数も最後に食べた日も同じなら店名順に並ぶこと() {
+    // R なか卯 と S すき家 は、どちらも 1 件・09/01。記録を入れた順（S すき家 が先）ではなく店名順
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 10);
+
+    assertThat(actual).extracting(Shop::getShopName).containsSubsequence("R なか卯", "S すき家");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_ほかの人の記録は件数にも最後に食べた日にも使わないこと() {
+    // W 松屋 は、ほかの人の新しい記録（11/20）を数えると 2 件・11/20 になり、先頭に来てしまう
+    // B ほかの人だけの店 は、ほかの人の記録が 3 件あるが、自分の記録がない店として最後に並ぶ
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Shop::getShopName).containsSubsequence("R なか卯", "S すき家", "W 松屋",
+        "A01");
+    assertThat(actual).last().extracting(Shop::getShopName).isEqualTo("B ほかの人だけの店");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_閉店した店とほかのエリアの店は自分の記録が多くても出さないこと() {
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, MY_USER_ID, 20);
+
+    assertThat(actual).extracting(Shop::getShopName).doesNotContain("V 閉店した店", "U 別のエリアの店");
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_自分の記録がひとつもない場合は今までの候補と同じ店名順になること() {
+    // 記録を 1 件も持たない利用者
+    String userId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(20L, userId, 10);
+
+    List<Shop> expected = sut.searchShopSuggestions(20L, null, null, 10);
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_店が1つもないエリアの場合は空のリストを返すこと() {
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(99L, MY_USER_ID, 10);
+
+    assertThat(actual).isEmpty();
+  }
+
+  @Test
+  @Sql("/sql/insert-shops-for-my-records.sql")
+  void よく使う順の店の候補_営業中の店がないエリアの場合は空のリストを返すこと() {
+    // エリア21には店があるが、閉店した店だけ
+    List<Shop> actual = sut.searchShopSuggestionsByMyRecords(21L, MY_USER_ID, 10);
 
     assertThat(actual).isEmpty();
   }

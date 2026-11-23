@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -26,6 +25,9 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +35,9 @@ import org.springframework.dao.DuplicateKeyException;
 
 @ExtendWith(MockitoExtension.class)
 class ShopServiceTest {
+
+  // 候補を探す利用者（JWT の sub）
+  private static final String USER_ID = "20b622c8-dd31-46e8-8f1a-64009c7febe5";
 
   @Mock
   private ShopRepository repository;
@@ -187,21 +192,21 @@ class ShopServiceTest {
     List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
     when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "スター");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "スター");
 
     assertThat(actual).isEqualTo(expected);
   }
 
   @Test
   void 店の候補_キーワードを正規化してから渡すこと() {
-    sut.searchShopSuggestions(20L, "　スター　バックス　"); // 前後と途中に全角スペース
+    sut.searchShopSuggestions(USER_ID, 20L, "　スター　バックス　"); // 前後と途中に全角スペース
 
     verify(repository).searchShopSuggestions(eq(20L), eq("スター バックス"), eq("スター バックス"), anyInt());
   }
 
   @Test
   void 店の候補_部分一致用はワイルドカードとバックスラッシュをエスケープし完全一致用はエスケープしないこと() {
-    sut.searchShopSuggestions(20L, "　100%_\\OFF　");
+    sut.searchShopSuggestions(USER_ID, 20L, "　100%_\\OFF　");
 
     // 部分一致用（LIKE）：100\%\_\\OFF、完全一致用：100%_\OFF（正規化だけ）
     verify(repository).searchShopSuggestions(eq(20L), eq("100\\%\\_\\\\OFF"), eq("100%_\\OFF"),
@@ -210,30 +215,48 @@ class ShopServiceTest {
 
   @Test
   void 店の候補_件数の上限を10件として渡すこと() {
-    sut.searchShopSuggestions(20L, "スター");
+    sut.searchShopSuggestions(USER_ID, 20L, "スター");
 
     verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq("スター"), eq(10));
   }
 
-  @Test
-  void 店の候補_キーワードが未指定の場合は部分一致用も完全一致用もnullのまま渡すこと() {
-    sut.searchShopSuggestions(20L, null);
+  // null・空文字・半角スペースだけ・全角スペースだけ・半角と全角のスペースが混ざったもの
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "　", " 　 "})
+  void 店の候補_キーワードがない場合はよく使う順の候補を利用者IDと上限10件で取得してそのまま返すこと(String keyword) {
+    List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
+    when(repository.searchShopSuggestionsByMyRecords(20L, USER_ID, 10)).thenReturn(expected);
 
-    verify(repository).searchShopSuggestions(eq(20L), isNull(), isNull(), anyInt());
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, keyword);
+
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "　", " 　 "})
+  void 店の候補_キーワードがない場合は店名でも読みでも探さないこと(String keyword) {
+    sut.searchShopSuggestions(USER_ID, 20L, keyword);
+
+    verify(repository, never()).searchShopSuggestions(any(), any(), any(), anyInt());
+    verify(nameReadingService, never()).createKeywordForms(any());
+    verify(repository, never()).searchAllShopSuggestions(any());
   }
 
   @Test
-  void 店の候補_キーワードが空文字の場合は部分一致用も完全一致用も空文字で渡すこと() {
-    sut.searchShopSuggestions(20L, "");
+  void 店の候補_キーワードがある場合はよく使う順の候補を使わないこと() {
+    sut.searchShopSuggestions(USER_ID, 20L, "スター");
 
-    verify(repository).searchShopSuggestions(eq(20L), eq(""), eq(""), anyInt());
+    verify(repository, never()).searchShopSuggestionsByMyRecords(any(), any(), anyInt());
   }
 
   @Test
-  void 店の候補_キーワードが空白だけの場合は正規化して空文字で渡すこと() {
-    sut.searchShopSuggestions(20L, " 　 ");
+  void 店の候補_前後にスペースがあるキーワードは空とみなさず店名で探すこと() {
+    sut.searchShopSuggestions(USER_ID, 20L, "　スター ");
 
-    verify(repository).searchShopSuggestions(eq(20L), eq(""), eq(""), anyInt());
+    verify(repository).searchShopSuggestions(eq(20L), eq("スター"), eq("スター"), anyInt());
+    verify(repository, never()).searchShopSuggestionsByMyRecords(any(), any(), anyInt());
   }
 
   @Test
@@ -241,7 +264,7 @@ class ShopServiceTest {
     List<Shop> expected = createShops(1L, 10);
     when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     assertThat(actual).isEqualTo(expected);
     verify(nameReadingService, never()).createKeywordForms(any());
@@ -250,20 +273,13 @@ class ShopServiceTest {
   }
 
   @Test
-  void 店の候補_キーワードが未指定の場合は読みでは探さないこと() {
-    sut.searchShopSuggestions(20L, null);
-
-    verify(nameReadingService, never()).createKeywordForms(any());
-    verify(repository, never()).searchAllShopSuggestions(any());
-  }
-
-  @Test
   void 店の候補_比べる形がない場合は全部を読み出さないこと() {
     List<Shop> expected = List.of(new Shop(1L, "スターバックス", 20L, 9L, false));
     when(repository.searchShopSuggestions(any(), any(), any(), anyInt())).thenReturn(expected);
-    when(nameReadingService.createKeywordForms(" 　 ")).thenReturn(List.of());
+    // 読みと比べる形が作れないキーワード（記号だけなど）
+    when(nameReadingService.createKeywordForms("・")).thenReturn(List.of());
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, " 　 ");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "・");
 
     assertThat(actual).isEqualTo(expected);
     verify(repository, never()).searchAllShopSuggestions(any());
@@ -274,7 +290,7 @@ class ShopServiceTest {
   void 店の候補_比べる形はエスケープも正規化もしていない入力から作ること() {
     when(nameReadingService.createKeywordForms(any())).thenReturn(List.of());
 
-    sut.searchShopSuggestions(20L, "　100%_\\OFF　");
+    sut.searchShopSuggestions(USER_ID, 20L, "　100%_\\OFF　");
 
     verify(nameReadingService).createKeywordForms("　100%_\\OFF　");
   }
@@ -290,7 +306,7 @@ class ShopServiceTest {
         .thenReturn(List.of(starbucks, matsuya, matsuyaCafe));
     stubMatchingNames(Set.of("松屋", "松屋珈琲"));
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = List.of(matsuya, matsuyaCafe);
     assertThat(actual).isEqualTo(expected);
@@ -311,7 +327,7 @@ class ShopServiceTest {
     when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(starbucks));
     stubMatchingNames(Set.of()); // どの店名も読みで当たらない
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = List.of(matsuyaKana, matsuyaStore);
     assertThat(actual).isEqualTo(expected);
@@ -328,7 +344,7 @@ class ShopServiceTest {
     when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(matsuya));
     stubMatchingNames(Set.of("松屋"));
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = List.of(matsuyaKana, matsuyaStore, matsuya);
     assertThat(actual).isEqualTo(expected);
@@ -347,7 +363,7 @@ class ShopServiceTest {
     when(repository.searchAllShopSuggestions(20L)).thenReturn(List.of(sameIdMatsuyaKana, matsuya));
     stubMatchingNames(Set.of("まつや", "マツヤ", "松屋"));
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = List.of(matsuyaKana, matsuya);
     assertThat(actual).isEqualTo(expected);
@@ -365,7 +381,7 @@ class ShopServiceTest {
     when(repository.searchAllShopSuggestions(20L)).thenReturn(readingMatches);
     when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = new ArrayList<>(nameMatches);
     expected.add(readingMatches.get(0));
@@ -380,7 +396,7 @@ class ShopServiceTest {
     when(repository.searchAllShopSuggestions(20L)).thenReturn(readingMatches);
     when(nameReadingService.matchesReading(any(), any())).thenReturn(true);
 
-    List<Shop> actual = sut.searchShopSuggestions(20L, "まつや");
+    List<Shop> actual = sut.searchShopSuggestions(USER_ID, 20L, "まつや");
 
     List<Shop> expected = readingMatches.subList(0, 10);
     assertThat(actual).isEqualTo(expected);
@@ -472,9 +488,22 @@ class ShopServiceTest {
     doThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999")).when(areaService)
         .searchArea(999L);
 
-    assertThatThrownBy(() -> sut.searchShopSuggestions(999L, null))
+    assertThatThrownBy(() -> sut.searchShopSuggestions(USER_ID, 999L, null))
         .isInstanceOf(InvalidAreaException.class).hasMessage("指定されたエリアが存在しません。areaId=999");
 
     verify(repository, never()).searchShopSuggestions(any(), any(), any(), anyInt());
+    verify(repository, never()).searchShopSuggestionsByMyRecords(any(), any(), anyInt());
+  }
+
+  @Test
+  void 店の候補_キーワードがありエリアが存在しない場合も例外を投げて検索しないこと() {
+    doThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999")).when(areaService)
+        .searchArea(999L);
+
+    assertThatThrownBy(() -> sut.searchShopSuggestions(USER_ID, 999L, "スター"))
+        .isInstanceOf(InvalidAreaException.class).hasMessage("指定されたエリアが存在しません。areaId=999");
+
+    verify(repository, never()).searchShopSuggestions(any(), any(), any(), anyInt());
+    verify(repository, never()).searchShopSuggestionsByMyRecords(any(), any(), anyInt());
   }
 }
