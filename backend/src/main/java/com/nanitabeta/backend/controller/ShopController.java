@@ -16,6 +16,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -98,19 +100,23 @@ public class ShopController {
   /**
    * 店の登録時に表示する候補を取得します。
    * <p>
-   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名に含まれる店だけを返します。
+   * 閉店した店は候補に出しません。キーワードを指定した場合は、店名（または読み）に当たる店を返します。 キーワードがない場合は、ログイン中の利用者がよく使う順に並べます。
    *
+   * @param jwt ログイン中の利用者の JWT
    * @param areaId エリアID
-   * @param keyword 店名の一部（省略した場合は絞り込まない）
+   * @param keyword 店名の一部（省略・空文字・スペースだけの場合は絞り込まない）
    * @return 店の一覧
    */
-  @Operation(summary = "店の候補の取得", description = "エリア内の店を候補として取得します。閉店した店は含みません。")
+  @Operation(summary = "店の候補の取得",
+      description = "エリア内の店を候補として、最大 10 件取得します。閉店した店は含みません。keyword がある場合は、店名または読みに当たる店を返します。"
+          + "keyword がない（省略・空文字・スペースだけ）場合は、ログイン中の利用者の記録が多い店、同じなら最後に食べた日（eaten_on）が新しい店の順に並べ、"
+          + "自分の記録がない店はそのうしろに店名順（DB の並び順。読みの五十音順ではない）で並べます。")
   @ApiResponse(responseCode = "200", description = "取得成功")
   @ApiResponse(responseCode = "400", description = "エリアIDが指定されていない、数値でない、またはエリアが存在しない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @GetMapping("/api/shops/suggestions")
-  public List<Shop> searchShopSuggestions(@RequestParam Long areaId,
-      @RequestParam(required = false) String keyword) {
-    return service.searchShopSuggestions(areaId, keyword);
+  public List<Shop> searchShopSuggestions(@AuthenticationPrincipal Jwt jwt,
+      @RequestParam Long areaId, @RequestParam(required = false) String keyword) {
+    return service.searchShopSuggestions(jwt.getSubject(), areaId, keyword);
   }
 }

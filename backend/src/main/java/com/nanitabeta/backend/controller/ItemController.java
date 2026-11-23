@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -35,19 +37,25 @@ public class ItemController {
 
   /**
    * 指定した店の商品を、入力補助の候補として取得します。
+   * <p>
+   * 記録が 1 件以上ある商品だけを返します。キーワードを指定した場合は、商品名（または読み）に当たる商品を返します。 キーワードがない場合は、ログイン中の利用者がよく使う順に並べます。
    *
+   * @param jwt ログイン中の利用者の JWT
    * @param shopId 店ID
-   * @param keyword 商品名の一部（省略した場合は絞り込まない）
+   * @param keyword 商品名の一部（省略・空文字・スペースだけの場合は絞り込まない）
    * @return 商品の一覧
    */
-  @Operation(summary = "商品の候補の取得", description = "指定した店の商品を候補として取得します。")
+  @Operation(summary = "商品の候補の取得",
+      description = "指定した店の商品を候補として、最大 10 件取得します。だれかの記録が 1 件以上ある商品だけを返します。keyword がある場合は、商品名または読みに当たる商品を返します。"
+          + "keyword がない（省略・空文字・スペースだけ）場合は、ログイン中の利用者の記録が多い商品、同じなら最後に食べた日（eaten_on）が新しい商品の順に並べ、"
+          + "自分の記録がない商品はそのうしろに商品名順（DB の並び順。読みの五十音順ではない）で並べます。")
   @ApiResponse(responseCode = "200", description = "取得成功")
   @ApiResponse(responseCode = "404", description = "店が見つからない",
       content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
   @GetMapping("/api/shops/{shopId}/items")
-  public List<Item> searchItemSuggestions(@PathVariable Long shopId,
-      @RequestParam(required = false) String keyword) {
-    return service.searchItemSuggestions(shopId, keyword);
+  public List<Item> searchItemSuggestions(@AuthenticationPrincipal Jwt jwt,
+      @PathVariable Long shopId, @RequestParam(required = false) String keyword) {
+    return service.searchItemSuggestions(jwt.getSubject(), shopId, keyword);
   }
 
   /**

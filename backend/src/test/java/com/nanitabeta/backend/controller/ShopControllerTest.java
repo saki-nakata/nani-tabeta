@@ -1,5 +1,6 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -107,7 +108,7 @@ class ShopControllerTest {
 
   @Test
   void 店の候補の取得_店の一覧がJSONで返ること() throws Exception {
-    when(service.searchShopSuggestions(20L, "スター"))
+    when(service.searchShopSuggestions(USER_ID, 20L, "スター"))
         .thenReturn(List.of(new Shop(1L, "スターバックス", 20L, 9L, false)));
 
     mockMvc
@@ -118,7 +119,21 @@ class ShopControllerTest {
             [{"id": 1, "shopName": "スターバックス", "areaId": 20, "shopKindId": 9, "isClosed": false}]
             """));
 
-    verify(service).searchShopSuggestions(20L, "スター");
+    // JWT の sub を、利用者 ID として渡す
+    verify(service).searchShopSuggestions(USER_ID, 20L, "スター");
+  }
+
+  @Test
+  void 店の候補の取得_キーワードがない場合はnullのまま利用者IDと一緒に渡すこと() throws Exception {
+    when(service.searchShopSuggestions(USER_ID, 20L, null))
+        .thenReturn(List.of(new Shop(1L, "スターバックス", 20L, 9L, false)));
+
+    mockMvc.perform(get("/api/shops/suggestions").with(registeredUser()).param("areaId", "20"))
+        .andExpect(status().isOk()).andExpect(content().json("""
+            [{"id": 1, "shopName": "スターバックス", "areaId": 20, "shopKindId": 9, "isClosed": false}]
+            """));
+
+    verify(service).searchShopSuggestions(USER_ID, 20L, null);
   }
 
   @Test
@@ -129,7 +144,15 @@ class ShopControllerTest {
              "message": "リクエストのパラメータが正しくありません。"}
             """));
 
-    verify(service, never()).searchShopSuggestions(any(), any());
+    verify(service, never()).searchShopSuggestions(any(), any(), any());
+  }
+
+  @Test
+  void 店の候補の取得_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(get("/api/shops/suggestions").param("areaId", "20"))
+        .andExpect(status().isUnauthorized());
+
+    verify(service, never()).searchShopSuggestions(any(), any(), any());
   }
 
   @Test
@@ -216,7 +239,7 @@ class ShopControllerTest {
 
   @Test
   void 店の候補の取得_エリアが存在しない場合は400が返ること() throws Exception {
-    when(service.searchShopSuggestions(any(), any()))
+    when(service.searchShopSuggestions(any(), any(), any()))
         .thenThrow(new InvalidAreaException("指定されたエリアが存在しません。areaId=999"));
 
     mockMvc.perform(get("/api/shops/suggestions").with(registeredUser()).param("areaId", "999"))

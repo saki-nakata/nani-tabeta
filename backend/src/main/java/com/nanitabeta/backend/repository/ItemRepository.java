@@ -51,6 +51,21 @@ public interface ItemRepository {
   List<Item> searchAllItemSuggestions(Long shopId);
 
   /**
+   * キーワードがないときの、指定した店の商品の候補を取得します（よく使う順）。
+   * <p>
+   * 候補にする商品は {@link #searchItemSuggestions} と同じ（その店の商品で、だれかの記録があるもの）です。
+   * 自分の記録が多い商品、同じなら最後に食べた日（eaten_on）が新しい商品を先にし、そのあとは商品名順、同じ商品名は商品ID順です。
+   * 自分の記録がない商品は、記録がある商品のうしろに商品名順で並びます。 件数と最後に食べた日には、ほかの利用者の記録を含めません。
+   *
+   * @param shopId 店ID
+   * @param userId 利用者のID（JWT の sub）
+   * @param limit 取得する最大件数
+   * @return 商品の一覧（該当がない場合は空のリスト）
+   */
+  List<Item> searchItemSuggestionsByMyRecords(@Param("shopId") Long shopId,
+      @Param("userId") String userId, @Param("limit") int limit);
+
+  /**
    * 店と商品名が一致する商品を取得します。
    * <p>
    * 引数の商品のうち、店ID（shopId）と商品名（itemName）だけを使います。

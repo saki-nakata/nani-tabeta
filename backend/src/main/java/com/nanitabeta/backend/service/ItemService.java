@@ -56,28 +56,34 @@ public class ItemService {
   /**
    * 指定した店の商品を、入力補助の候補として取得します。
    * <p>
-   * まず商品名で探します（キーワードを含む商品。LOWER 一致の商品名を先頭に、残りは商品名順）。 件数の上限に足りない場合は、読みがキーワードに当たる商品を、商品名順にうしろへ足します
-   * （「まっちゃ」で「抹茶ラテ」、「latte」で「ラテ」を見つけるため）。 商品名で上限まで見つかった場合は、読みでは探しません。
+   * キーワードがない場合（null・空文字・スペースだけ）は、ログイン中の利用者がよく使う順に並べます
+   * （自分の記録が多い商品、同じなら最後に食べた日が新しい商品、そのあとは商品名順。自分の記録がない商品はうしろに商品名順）。
+   * <p>
+   * キーワードがある場合は、まず商品名で探します（キーワードを含む商品。LOWER 一致の商品名を先頭に、残りは商品名順）。
+   * 件数の上限に足りない場合は、読みがキーワードに当たる商品を、商品名順にうしろへ足します （「まっちゃ」で「抹茶ラテ」、「latte」で「ラテ」を見つけるため）。
+   * 商品名で上限まで見つかった場合は、読みでは探しません。
    *
+   * @param userId 利用者のID（JWT の sub。キーワードがない場合の並びに使う）
    * @param shopId 店ID
-   * @param keyword 商品名の一部（null または空文字の場合は絞り込まない）
+   * @param keyword 商品名の一部（null・空文字・スペースだけの場合は絞り込まず、よく使う順に並べる）
    * @return 商品の一覧（該当がない場合は空のリスト）
    * @throws ResourceNotFoundException 店が見つからない場合
    */
-  public List<Item> searchItemSuggestions(Long shopId, String keyword) {
+  public List<Item> searchItemSuggestions(String userId, Long shopId, String keyword) {
     shopService.searchShop(shopId); // 存在しない場合は ResourceNotFoundException
 
-    String sameKeyword = null; // LOWER 一致用（先頭に並べる）
-    String likeKeyword = null; // 部分一致用
-    if (keyword != null) {
-      sameKeyword = NameNormalizer.normalize(keyword);
-      likeKeyword = LikeEscaper.escape(sameKeyword);
+    // LOWER 一致用（先頭に並べる）
+    String sameKeyword = keyword == null ? null : NameNormalizer.normalize(keyword);
+    // キーワードがない（未指定・空文字・スペースだけ）ときは、自分の記録で並べる
+    if (sameKeyword == null || sameKeyword.isEmpty()) {
+      return repository.searchItemSuggestionsByMyRecords(shopId, userId, SUGGESTION_LIMIT);
     }
+    String likeKeyword = LikeEscaper.escape(sameKeyword); // 部分一致用
     List<Item> suggestions =
         repository.searchItemSuggestions(shopId, likeKeyword, sameKeyword, SUGGESTION_LIMIT);
 
-    // 商品名で上限まで見つかった、またはキーワードがない場合は、読みでは探さない
-    if (keyword == null || suggestions.size() >= SUGGESTION_LIMIT) {
+    // 商品名で上限まで見つかった場合は、読みでは探さない
+    if (suggestions.size() >= SUGGESTION_LIMIT) {
       return suggestions;
     }
     // 読みと比べる形は、LIKE のエスケープ前のキーワードから作る（% や _ を普通の文字として比べるため）

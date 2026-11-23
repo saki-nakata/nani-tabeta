@@ -1,5 +1,6 @@
 package com.nanitabeta.backend.controller;
 
+import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -42,7 +43,7 @@ class ItemControllerTest {
   @Test
   void 商品の候補の取得_商品の一覧がJSONで返ること() throws Exception {
     List<Item> expected = List.of(new Item(1L, 1L, "からあげ棒", 4L, false));
-    when(service.searchItemSuggestions(1L, "から")).thenReturn(expected);
+    when(service.searchItemSuggestions(USER_ID, 1L, "から")).thenReturn(expected);
 
     mockMvc.perform(get("/api/shops/1/items").with(registeredUser()).param("keyword", "から"))
         .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -50,21 +51,29 @@ class ItemControllerTest {
             [{"id": 1, "shopId": 1, "itemName": "からあげ棒", "categoryId": 4, "isSeasonal": false}]
             """));
 
-    verify(service).searchItemSuggestions(1L, "から");
+    // JWT の sub を、利用者 ID として渡す
+    verify(service).searchItemSuggestions(USER_ID, 1L, "から");
   }
 
   @Test
-  void 商品の候補の取得_キーワードを省略した場合はnullで呼ばれること() throws Exception {
-    when(service.searchItemSuggestions(1L, null)).thenReturn(List.of());
+  void 商品の候補の取得_キーワードを省略した場合はnullのまま利用者IDと一緒に渡すこと() throws Exception {
+    when(service.searchItemSuggestions(USER_ID, 1L, null)).thenReturn(List.of());
 
     mockMvc.perform(get("/api/shops/1/items").with(registeredUser())).andExpect(status().isOk());
 
-    verify(service).searchItemSuggestions(1L, null);
+    verify(service).searchItemSuggestions(USER_ID, 1L, null);
+  }
+
+  @Test
+  void 商品の候補の取得_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(get("/api/shops/1/items")).andExpect(status().isUnauthorized());
+
+    verify(service, never()).searchItemSuggestions(any(), any(), any());
   }
 
   @Test
   void 商品の候補の取得_店が見つからない場合は404が返ること() throws Exception {
-    when(service.searchItemSuggestions(any(), any()))
+    when(service.searchItemSuggestions(any(), any(), any()))
         .thenThrow(new ResourceNotFoundException("店が見つかりません。id=999"));
 
     mockMvc.perform(get("/api/shops/999/items").with(registeredUser()))

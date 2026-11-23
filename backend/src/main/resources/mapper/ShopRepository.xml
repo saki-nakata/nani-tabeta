@@ -71,4 +71,28 @@
       AND is_closed = FALSE
     ORDER BY shop_name, id
   </select>
+
+  <!-- エリア内の店の候補（キーワードがないとき。閉店を除く）
+       自分の記録が多い店 → 同じなら最後に食べた日が新しい店 → 店名 → ID の順。自分の記録がない店は、そのうしろに店名 → ID の順
+       my_shop_records：自分の記録を店ごとにまとめたもの（1 行が 1 つの店。record_count＝件数、last_eaten_on＝最後に食べた日） -->
+  <select id="searchShopSuggestionsByMyRecords" resultType="com.nanitabeta.backend.data.Shop">
+    SELECT shops.id, shops.shop_name, shops.area_id, shops.shop_kind_id, shops.is_closed
+    FROM shops
+    LEFT JOIN (
+      SELECT items.shop_id,
+             COUNT(*) AS record_count,
+             MAX(records.eaten_on) AS last_eaten_on
+      FROM records
+      JOIN items ON items.id = records.item_id
+      WHERE records.user_id = #{userId}
+      GROUP BY items.shop_id
+    ) AS my_shop_records ON my_shop_records.shop_id = shops.id
+    WHERE shops.area_id = #{areaId}
+      AND shops.is_closed = FALSE
+    ORDER BY COALESCE(my_shop_records.record_count, 0) DESC,
+             my_shop_records.last_eaten_on DESC,
+             shops.shop_name,
+             shops.id
+    LIMIT #{limit}
+  </select>
 </mapper>
