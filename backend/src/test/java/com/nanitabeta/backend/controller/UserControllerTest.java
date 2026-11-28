@@ -130,6 +130,14 @@ class UserControllerTest {
   }
 
   @Test
+  void 自分の取得_JWTが付いていない場合は401が返ること() throws Exception {
+    // 記録の詳細をログインなしで見られるようにしたあとも、本人確認の API はログインが必要
+    mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
+
+    verify(service, never()).searchUser(any());
+  }
+
+  @Test
   void 自分の取得_ユーザーとして登録されていない場合は403が返ること() throws Exception {
     mockMvc.perform(get("/api/users/me").with(unregisteredUser()))
         .andExpect(status().isForbidden());

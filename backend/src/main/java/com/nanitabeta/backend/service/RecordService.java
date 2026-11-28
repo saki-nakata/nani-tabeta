@@ -47,18 +47,20 @@ public class RecordService {
   private ItemService itemService;
   private ShopService shopService;
   private CategoryService categoryService;
+  private UserService userService;
 
   @Autowired
   public RecordService(RecordRepository repository, ItemService itemService,
-      ShopService shopService, CategoryService categoryService) {
+      ShopService shopService, CategoryService categoryService, UserService userService) {
     this.repository = repository;
     this.itemService = itemService;
     this.shopService = shopService;
     this.categoryService = categoryService;
+    this.userService = userService;
   }
 
   /**
-   * 記録の詳細（記録と、その商品・店・写真）を取得します。
+   * 記録の詳細（記録と、その商品・店・写真、記録した人のニックネーム）を取得します。
    *
    * @param id 記録ID
    * @return 記録の詳細
@@ -72,7 +74,9 @@ public class RecordService {
     Item item = itemService.searchItem(record.getItemId());
     Shop shop = shopService.searchShop(item.getShopId());
     List<String> photoPaths = repository.searchRecordPhotoPaths(id);
-    return new RecordDetail(record, item, shop, photoPaths);
+    // 見ている人ではなく、記録を書いた人のニックネーム
+    String nickname = userService.searchUser(record.getUserId()).getNickname();
+    return new RecordDetail(record, item, shop, photoPaths, nickname);
   }
 
   /**
@@ -281,7 +285,8 @@ public class RecordService {
     }
     // 取り直すのは、自分で INSERT した記録と写真だけ。商品と店は上で手に入れたものを使う
     return new RecordDetail(repository.searchRecord(record.getId()), linkedItem, shop,
-        repository.searchRecordPhotoPaths(record.getId()));
+        repository.searchRecordPhotoPaths(record.getId()),
+        userService.searchUser(input.getUserId()).getNickname());
   }
 
   /**
@@ -363,7 +368,8 @@ public class RecordService {
     List<String> removedPhotoPaths =
         beforePhotoPaths.stream().filter(path -> !paths.contains(path)).toList();
     RecordDetail recordDetail = new RecordDetail(repository.searchRecord(id), linkedItem, shop,
-        repository.searchRecordPhotoPaths(id));
+        repository.searchRecordPhotoPaths(id),
+        userService.searchUser(myRecord.getUserId()).getNickname());
     return new RecordUpdateResult(recordDetail, removedPhotoPaths);
   }
 

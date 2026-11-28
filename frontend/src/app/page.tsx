@@ -10,7 +10,7 @@ import type { Category, ShopKind } from "@/types/master";
 import { loadRecordList, type LoadRecordListResult } from "./actions";
 
 export default async function Home() {
-  const me = await searchMe();
+  const me = await searchMe({ allowGuest: false });
   if (!me) {
     redirect("/signup");
   }
@@ -47,7 +47,7 @@ export default async function Home() {
 
   return (
     <>
-      <AppHeader />
+      <AppHeader isGuest={false} />
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
         <p className="text-sm">{me.nickname} さん、こんにちは</p>
         <RecordHome

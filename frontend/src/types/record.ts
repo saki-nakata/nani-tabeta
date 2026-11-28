@@ -20,6 +20,8 @@ export type RecordDetail = {
   item: Item;
   shop: Shop;
   photoPaths: string[];
+  // 記録した人のニックネーム（見ている人ではなく、記録を書いた人）
+  nickname: string;
 };
 
 // 記録を編集した結果（PUT /api/records/{id} の形）

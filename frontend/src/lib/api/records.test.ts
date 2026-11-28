@@ -8,6 +8,7 @@ import type {
 import { ApiError } from "./client";
 import {
   deleteRecord,
+  findPublicRecord,
   findRecord,
   registerRecord,
   searchRecord,
@@ -16,11 +17,15 @@ import {
   searchRecordYears,
 } from "./records";
 
-// 本物の ApiError は使い、apiFetch だけを偽物に差し替える
-const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
+// 本物の ApiError は使い、apiFetch と publicApiFetch だけを偽物に差し替える
+const { apiFetch, publicApiFetch } = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
+  publicApiFetch: vi.fn(),
+}));
 vi.mock("./client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./client")>()),
   apiFetch,
+  publicApiFetch,
 }));
 
 const recordDetail: RecordDetail = {
@@ -50,6 +55,7 @@ const recordDetail: RecordDetail = {
     isClosed: false,
   },
   photoPaths: ["9249f1a6-72e2-404f-bd10-fa33c077575d/records/a.webp"],
+  nickname: "Saki",
 };
 
 afterEach(() => {
@@ -134,6 +140,39 @@ describe("findRecord", () => {
     apiFetch.mockRejectedValue(expected);
 
     const actual = findRecord(12);
+
+    await expect(actual).rejects.toBe(expected);
+  });
+});
+
+describe("findPublicRecord", () => {
+  test("ログインしていなくても読める呼び方で GET /api/records/{id} を呼び、記録の詳細と isGuest をそのまま返すこと", async () => {
+    const expected = { data: recordDetail, isGuest: true };
+    publicApiFetch.mockResolvedValue(expected);
+
+    const actual = await findPublicRecord(12);
+
+    expect(actual).toEqual(expected);
+    expect(publicApiFetch).toHaveBeenCalledWith("/api/records/12");
+    // ログインが必要な呼び方は使わない
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  test("見つからない（404）ときは、null を返すこと", async () => {
+    publicApiFetch.mockRejectedValue(
+      new ApiError(404, "記録が見つかりません。"),
+    );
+
+    const actual = await findPublicRecord(999);
+
+    expect(actual).toBeNull();
+  });
+
+  test("404 以外の失敗は、そのまま投げること（エラーの画面にするため）", async () => {
+    const expected = new ApiError(500, "サーバーでエラーが発生しました。");
+    publicApiFetch.mockRejectedValue(expected);
+
+    const actual = findPublicRecord(12);
 
     await expect(actual).rejects.toBe(expected);
   });

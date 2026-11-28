@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.nanitabeta.backend.data.FoodRecord;
 import com.nanitabeta.backend.data.Item;
 import com.nanitabeta.backend.data.RecordPhoto;
 import com.nanitabeta.backend.data.Shop;
+import com.nanitabeta.backend.data.User;
 import com.nanitabeta.backend.domain.RecordDetail;
 import com.nanitabeta.backend.domain.RecordListCard;
 import com.nanitabeta.backend.domain.RecordListCursor;
@@ -31,6 +33,7 @@ import com.nanitabeta.backend.exception.ResourceNotFoundException;
 import com.nanitabeta.backend.repository.RecordRepository;
 import java.time.LocalDate;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -68,11 +71,23 @@ class RecordServiceTest {
   @Mock
   private CategoryService categoryService;
 
+  @Mock
+  private UserService userService;
+
   @InjectMocks
   private RecordService sut;
 
+  @BeforeEach
+  void setUpUsers() {
+    // 記録の詳細を返す処理はどれも、記録した人のニックネームを読む。使わないテストもあるので lenient にする
+    lenient().when(userService.searchUser(USER_ID))
+        .thenReturn(new User(USER_ID, "Saki", null, null, "user"));
+    lenient().when(userService.searchUser(OTHER_USER_ID))
+        .thenReturn(new User(OTHER_USER_ID, "test2", null, null, "user"));
+  }
+
   @Test
-  void 記録の詳細_記録と商品と店と写真をまとめて返すこと() {
+  void 記録の詳細_記録と商品と店と写真と記録した人のニックネームをまとめて返すこと() {
     FoodRecord record = new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, 0);
     Item item = new Item(6L, 2L, "からあげ棒", 4L, false);
     Shop shop = new Shop(2L, "セブンイレブン", 20L, 1L, false);
@@ -80,11 +95,26 @@ class RecordServiceTest {
     when(itemService.searchItem(6L)).thenReturn(item);
     when(shopService.searchShop(2L)).thenReturn(shop);
     when(repository.searchRecordPhotoPaths(1L)).thenReturn(List.of(PHOTO_1));
-    RecordDetail expected = new RecordDetail(record, item, shop, List.of(PHOTO_1));
+    RecordDetail expected = new RecordDetail(record, item, shop, List.of(PHOTO_1), "Saki");
 
     RecordDetail actual = sut.searchRecordDetail(1L);
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  void 記録の詳細_ニックネームは記録を書いた人のものを返すこと() {
+    // 記録の詳細はほかの人も見るので、見ている人ではなく、記録の userId の人のニックネームを出す
+    FoodRecord othersRecord =
+        new FoodRecord(5L, OTHER_USER_ID, 6L, EATEN_ON, null, null, 3, null, 0);
+    when(repository.searchRecord(5L)).thenReturn(othersRecord);
+    when(itemService.searchItem(6L)).thenReturn(new Item(6L, 2L, "からあげ棒", 4L, false));
+    when(shopService.searchShop(2L)).thenReturn(new Shop(2L, "セブンイレブン", 20L, 1L, false));
+
+    RecordDetail actual = sut.searchRecordDetail(5L);
+
+    assertThat(actual.getNickname()).isEqualTo("test2");
+    verify(userService).searchUser(OTHER_USER_ID);
   }
 
   @Test
@@ -118,7 +148,7 @@ class RecordServiceTest {
     FoodRecord expectedArgument =
         new FoodRecord(1L, USER_ID, 6L, EATEN_ON, null, "衣がサクサク", 4, 220, null);
     RecordDetail expected =
-        new RecordDetail(registered, linkedItem, shop, List.of(PHOTO_1, PHOTO_2));
+        new RecordDetail(registered, linkedItem, shop, List.of(PHOTO_1, PHOTO_2), "Saki");
 
     RecordDetail actual = sut.registerRecord(input, item, List.of(PHOTO_1, PHOTO_2));
 
@@ -221,7 +251,8 @@ class RecordServiceTest {
     FoodRecord expectedArgument =
         new FoodRecord(2L, USER_ID, 6L, EATEN_ON, null, "少し冷めていた", 3, 250, 3);
     RecordUpdateResult expected = new RecordUpdateResult(
-        new RecordDetail(updated, linkedItem, shop, List.of(PHOTO_2, PHOTO_1)), List.of(PHOTO_3));
+        new RecordDetail(updated, linkedItem, shop, List.of(PHOTO_2, PHOTO_1), "Saki"),
+        List.of(PHOTO_3));
 
     RecordUpdateResult actual = sut.updateRecord(2L, input, item, List.of(PHOTO_2, PHOTO_1));
 

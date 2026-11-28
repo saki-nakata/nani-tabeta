@@ -102,6 +102,7 @@ const editingRecord: RecordDetail = {
     isClosed: false,
   },
   photoPaths: [A, B],
+  nickname: "Saki",
 };
 
 // 保存済みの写真（編集画面と同じく、パスを id にする）

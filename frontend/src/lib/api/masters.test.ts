@@ -5,9 +5,9 @@ import {
   searchShopKinds,
 } from "./masters";
 
-// apiFetch だけを偽物に差し替え、どの URL で呼んだかを確かめる
-const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
-vi.mock("./client", () => ({ apiFetch }));
+// publicApiFetch だけを偽物に差し替え、どの URL で呼んだかを確かめる
+const { publicApiFetch } = vi.hoisted(() => ({ publicApiFetch: vi.fn() }));
+vi.mock("./client", () => ({ publicApiFetch }));
 
 afterEach(() => {
   vi.resetAllMocks();
@@ -18,13 +18,17 @@ describe("マスタの取得", () => {
     ["searchRegionDetails", searchRegionDetails, "/api/areas"],
     ["searchCategories", searchCategories, "/api/categories"],
     ["searchShopKinds", searchShopKinds, "/api/shop-kinds"],
-  ])("%s は GET %s を呼び、結果をそのまま返すこと", async (_, search, path) => {
-    const expected = [{ id: 1 }];
-    apiFetch.mockResolvedValue(expected);
+  ])(
+    "%s はログインしていなくても読める呼び方で GET %s を呼び、データだけを返すこと",
+    async (_, search, path) => {
+      const expected = [{ id: 1 }];
+      publicApiFetch.mockResolvedValue({ data: expected, isGuest: true });
 
-    const actual = await search();
+      const actual = await search();
 
-    expect(actual).toBe(expected);
-    expect(apiFetch).toHaveBeenCalledWith(path);
-  });
+      // isGuest は使わず、今までと同じ形（一覧そのもの）で返す
+      expect(actual).toBe(expected);
+      expect(publicApiFetch).toHaveBeenCalledWith(path);
+    },
+  );
 });

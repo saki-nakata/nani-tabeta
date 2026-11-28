@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * 記録の詳細（記録と、その商品・店・写真）です。
+ * 記録の詳細（記録と、その商品・店・写真、記録した人のニックネーム）です。
  */
-@Schema(description = "記録の詳細（記録と、その商品・店・写真）")
+@Schema(description = "記録の詳細（記録と、その商品・店・写真、記録した人のニックネーム）")
 @Getter
 @Setter
 @AllArgsConstructor
@@ -33,4 +33,8 @@ public class RecordDetail {
 
   @Schema(description = "写真のパスの一覧（先頭が代表写真）", requiredMode = Schema.RequiredMode.REQUIRED)
   private List<String> photoPaths;
+
+  @Schema(description = "記録した人のニックネーム", example = "Saki",
+      requiredMode = Schema.RequiredMode.REQUIRED)
+  private String nickname;
 }

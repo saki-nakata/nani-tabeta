@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nanitabeta.backend.controller.CategoryController;
+import com.nanitabeta.backend.controller.UserController;
 import com.nanitabeta.backend.data.User;
 import com.nanitabeta.backend.repository.UserRepository;
 import com.nanitabeta.backend.service.CategoryService;
+import com.nanitabeta.backend.service.UserService;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -45,8 +47,11 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>
  * Supabase の代わりに、テストの中で鍵を作り、公開鍵（JWKS）を配る小さなサーバーを起動します。 SUPABASE_URL
  * をそのサーバーに向けるので、issuer-uri・jwk-set-uri・audiences・jws-algorithms は application.yaml に書いた値がそのまま使われます。
+ * <p>
+ * 分類の一覧（GET /api/categories）はログインしていなくても使える API、自分の取得（GET /api/users/me）は登録済みの利用者だけが使える API
+ * として使います。ログインしていなくても使える API でも、無効な JWT が付いていれば 401 になることを確かめます。
  */
-@WebMvcTest(CategoryController.class)
+@WebMvcTest({CategoryController.class, UserController.class})
 @Import(SecurityConfig.class)
 class JwtAuthenticationTest {
 
@@ -70,6 +75,9 @@ class JwtAuthenticationTest {
 
   @MockitoBean
   private CategoryService categoryService;
+
+  @MockitoBean
+  private UserService userService;
 
   @MockitoBean
   private UserRepository userRepository;
@@ -96,15 +104,39 @@ class JwtAuthenticationTest {
   }
 
   @Test
-  void 正しいJWTでもユーザーとして登録されていない場合は403が返ること() throws Exception {
+  void 正しいJWTでもユーザーとして登録されていない場合は登録済みの利用者だけが使えるAPIで403が返ること() throws Exception {
     when(userRepository.searchUser(USER_ID)).thenReturn(null);
     String token = createJwt(SIGNING_KEY, ISSUER, "authenticated", inOneHour());
 
-    mockMvc.perform(get("/api/categories").header("Authorization", "Bearer " + token))
+    mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
         .andExpect(status().isForbidden());
 
-    verify(categoryService, never()).searchCategoryList();
+    verify(userService, never()).searchUser(any());
   }
+
+  @Test
+  void 正しいJWTでユーザーとして登録されていない場合もログインなしで使えるAPIは200が返ること() throws Exception {
+    when(userRepository.searchUser(USER_ID)).thenReturn(null);
+    when(categoryService.searchCategoryList()).thenReturn(List.of());
+    String token = createJwt(SIGNING_KEY, ISSUER, "authenticated", inOneHour());
+
+    mockMvc.perform(get("/api/categories").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void 有効期限が切れたJWTの場合は登録済みの利用者だけが使えるAPIで401が返ること() throws Exception {
+    Instant expired = Instant.now().minus(5, ChronoUnit.MINUTES);
+    String token = createJwt(SIGNING_KEY, ISSUER, "authenticated", expired);
+
+    mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+        .andExpect(status().isUnauthorized());
+
+    verify(userService, never()).searchUser(any());
+  }
+
+  // ここから下の 401 のテストは、ログインなしで使える API（/api/categories）に無効な JWT を付けたときのもの。
+  // 「ログインなしで使える」は JWT がないときの話で、付いてきた無効な JWT は無視されずに 401 になる
 
   @Test
   void 別の鍵で署名されたJWTの場合は401が返ること() throws Exception {

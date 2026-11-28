@@ -16,7 +16,7 @@ export default async function EditRecordPage({
   params: Promise<{ id: string }>;
 }) {
   // 未登録なら、初回登録へ案内する
-  const me = await searchMe();
+  const me = await searchMe({ allowGuest: false });
   if (!me) {
     redirect("/signup");
   }
