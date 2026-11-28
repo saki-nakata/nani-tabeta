@@ -2,12 +2,13 @@ package com.nanitabeta.backend.controller;
 
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
 import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
-import static org.mockito.Mockito.never;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nanitabeta.backend.config.SecurityConfig;
@@ -53,17 +54,23 @@ class CategoryControllerTest {
   }
 
   @Test
-  void 分類の一覧取得_JWTが付いていない場合は401が返ること() throws Exception {
-    mockMvc.perform(get("/api/categories")).andExpect(status().isUnauthorized());
+  void 分類の一覧取得_JWTが付いていなくても分類の一覧が返り途中で保存されないこと() throws Exception {
+    // 記録の詳細とタイムラインの絞り込みで使うので、ログインしていない人にも返す
+    when(service.searchCategoryList()).thenReturn(List.of(new Category(1L, "ごはんもの", "🍚")));
 
-    verify(service, never()).searchCategoryList();
+    mockMvc.perform(get("/api/categories")).andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", containsString("no-store")))
+        .andExpect(content().json("""
+            [{"id": 1, "categoryName": "ごはんもの", "categoryEmoji": "🍚"}]
+            """));
   }
 
   @Test
-  void 分類の一覧取得_ユーザーとして登録されていない場合は403が返ること() throws Exception {
-    mockMvc.perform(get("/api/categories").with(unregisteredUser()))
-        .andExpect(status().isForbidden());
+  void 分類の一覧取得_ユーザーとして登録されていなくても分類の一覧が返ること() throws Exception {
+    when(service.searchCategoryList()).thenReturn(List.of(new Category(1L, "ごはんもの", "🍚")));
 
-    verify(service, never()).searchCategoryList();
+    mockMvc.perform(get("/api/categories").with(unregisteredUser())).andExpect(status().isOk());
+
+    verify(service, times(1)).searchCategoryList();
   }
 }

@@ -2,6 +2,8 @@ package com.nanitabeta.backend.controller;
 
 import static com.nanitabeta.backend.controller.TestUsers.USER_ID;
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
+import static com.nanitabeta.backend.controller.TestUsers.unregisteredUser;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -12,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nanitabeta.backend.config.ClockConfig;
@@ -92,7 +95,7 @@ class RecordControllerTest {
   private static RecordDetail recordDetail(LocalDate eatenOn) {
     return new RecordDetail(new FoodRecord(1L, USER_ID, 6L, eatenOn, null, "衣がサクサク", 4, 220, 0),
         new Item(6L, 2L, "からあげ棒", 4L, false), new Shop(2L, "セブンイレブン", 20L, 1L, false),
-        List.of(PHOTO));
+        List.of(PHOTO), "Saki");
   }
 
   @Test
@@ -108,7 +111,7 @@ class RecordControllerTest {
                       "isSeasonal": false},
              "shop": {"id": 2, "shopName": "セブンイレブン", "areaId": 20, "shopKindId": 1,
                       "isClosed": false},
-             "photoPaths": ["%s"]}
+             "photoPaths": ["%s"], "nickname": "Saki"}
             """.formatted(USER_ID, PHOTO)));
   }
 
@@ -124,6 +127,42 @@ class RecordControllerTest {
   }
 
   @Test
+  void 記録の取得_JWTが付いていなくても記録の詳細が返り途中で保存されないこと() throws Exception {
+    // 記録の詳細は、ログインしていない人も見られる
+    when(service.searchRecordDetail(1L)).thenReturn(recordDetail(LocalDate.of(2020, 1, 1)));
+
+    mockMvc.perform(get("/api/records/1")).andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", containsString("no-store")))
+        .andExpect(content().json("""
+            {"record": {"id": 1, "userId": "%s"}, "item": {"itemName": "からあげ棒"},
+             "shop": {"shopName": "セブンイレブン"}, "photoPaths": ["%s"], "nickname": "Saki"}
+            """.formatted(USER_ID, PHOTO)));
+  }
+
+  @Test
+  void 記録の取得_ユーザーとして登録されていなくても記録の詳細が返ること() throws Exception {
+    when(service.searchRecordDetail(1L)).thenReturn(recordDetail(LocalDate.of(2020, 1, 1)));
+
+    mockMvc.perform(get("/api/records/1").with(unregisteredUser())).andExpect(status().isOk());
+
+    verify(service).searchRecordDetail(1L);
+  }
+
+  @Test
+  void 記録の取得_JWTが付いていなくても見つからない場合は404が返ること() throws Exception {
+    when(service.searchRecordDetail(999L))
+        .thenThrow(new ResourceNotFoundException("記録が見つかりません。id=999"));
+
+    mockMvc.perform(get("/api/records/999")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void 記録の取得_IDが数字でないパスはログインなしで呼べる対象に入らず401が返ること() throws Exception {
+    // 「/api/records/{数字}」だけをログインなしで呼べるようにしているので、ほかの文字は対象外
+    mockMvc.perform(get("/api/records/abc")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
   void 記録の登録_JWTのsubを記録者として登録し201が返ること() throws Exception {
     LocalDate eatenOn = LocalDate.of(2020, 1, 1);
     when(service.registerRecord(any(), any(), any())).thenReturn(recordDetail(eatenOn));
@@ -135,7 +174,7 @@ class RecordControllerTest {
         .perform(post("/api/records").with(registeredUser()).contentType(MediaType.APPLICATION_JSON)
             .content(requestBody("\"2020-01-01\"")))
         .andExpect(status().isCreated()).andExpect(content().json("""
-            {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01"}}
+            {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01"}, "nickname": "Saki"}
             """.formatted(USER_ID)));
 
     verify(service).registerRecord(expectedRecord, expectedItem, List.of(PHOTO));
@@ -256,7 +295,8 @@ class RecordControllerTest {
             .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
         .andExpect(status().isOk()).andExpect(content().json("""
             {"recordDetail": {"record": {"id": 1, "userId": "%s", "eatenOn": "2020-01-01",
-                                         "version": 0}},
+                                         "version": 0},
+                              "nickname": "Saki"},
              "removedPhotoPaths": ["%s"]}
             """.formatted(USER_ID, OLD_PHOTO)));
 
@@ -473,6 +513,53 @@ class RecordControllerTest {
   @Test
   void 記録の一覧_JWTが付いていない場合は401が返ること() throws Exception {
     mockMvc.perform(get("/api/records")).andExpect(status().isUnauthorized());
+  }
+
+  // ここから、記録の詳細をログインなしで見られるようにしたあとも、ほかの API は今までどおり守られていることの確認
+
+  @Test
+  void 記録の登録_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(post("/api/records").contentType(MediaType.APPLICATION_JSON)
+        .content(requestBody("\"2020-01-01\""))).andExpect(status().isUnauthorized());
+
+    verify(service, never()).registerRecord(any(), any(), any());
+  }
+
+  @Test
+  void 記録の編集_JWTが付いていない場合は401が返ること() throws Exception {
+    // 詳細と同じ /api/records/{数字} でも、GET 以外はログインなしで呼べる対象に入らない
+    mockMvc.perform(put("/api/records/1").contentType(MediaType.APPLICATION_JSON)
+        .content(updateRequestBody("\"2020-01-01\""))).andExpect(status().isUnauthorized());
+
+    verify(service, never()).updateRecord(any(), any(), any(), any());
+  }
+
+  @Test
+  void 記録の削除_JWTが付いていない場合は401が返ること() throws Exception {
+    mockMvc.perform(delete("/api/records/1")).andExpect(status().isUnauthorized());
+
+    verify(service, never()).deleteRecord(any(), any());
+  }
+
+  @Test
+  void 記録の編集_ユーザーとして登録されていない場合は403が返ること() throws Exception {
+    mockMvc
+        .perform(put("/api/records/1").with(unregisteredUser())
+            .contentType(MediaType.APPLICATION_JSON).content(updateRequestBody("\"2020-01-01\"")))
+        .andExpect(status().isForbidden());
+
+    verify(service, never()).updateRecord(any(), any(), any(), any());
+  }
+
+  @Test
+  void 記録の一覧_ユーザーとして登録されていない場合は403が返ること() throws Exception {
+    mockMvc.perform(get("/api/records").with(unregisteredUser())).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void 記録がある年_ユーザーとして登録されていない場合は403が返ること() throws Exception {
+    mockMvc.perform(get("/api/records/years").with(unregisteredUser()))
+        .andExpect(status().isForbidden());
   }
 
   @Test

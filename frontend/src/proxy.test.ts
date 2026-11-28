@@ -69,17 +69,60 @@ describe("proxy", () => {
     expect(actual.headers.get("pragma")).toBe("no-cache");
   });
 
-  test.each(["/login", "/login?error=auth", "/auth/callback?code=abc"])(
-    "ログインしていなくても %s は移動させずに通すこと",
+  test.each([
+    "/login",
+    "/login?error=auth",
+    "/auth/callback?code=abc",
+    "/records/12",
+  ])("ログインしていなくても %s は移動させずに通すこと", async (path) => {
+    onGetClaims.mockResolvedValue({ data: null });
+
+    const actual = await proxy(requestTo(path));
+
+    expect(actual.headers.get("location")).toBeNull();
+    expect(actual.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  test.each([
+    "/records/new",
+    "/records/12/edit",
+    "/",
+    "/records/abc",
+    "/records",
+  ])(
+    "ログインしていなければ、記録の詳細に似たパスでも %s は /login へ移動させること",
     async (path) => {
       onGetClaims.mockResolvedValue({ data: null });
 
       const actual = await proxy(requestTo(path));
 
-      expect(actual.headers.get("location")).toBeNull();
-      expect(actual.headers.get("x-middleware-next")).toBe("1");
+      expect(actual.headers.get("location")).toBe(
+        "http://localhost:3000/login",
+      );
     },
   );
+
+  test("ログインしていない人が記録の詳細を開くときも、Supabase が指示した Cookie とキャッシュのヘッダーを返事に付けること", async () => {
+    // 期限切れのセッションを見つけた Supabase が、Cookie の削除を指示した場合でも、詳細はそのまま開く
+    onGetClaims.mockImplementation(async (cookies: CookieMethods) => {
+      cookies.setAll(
+        [{ name: "sb-test-auth-token", value: "", options: { maxAge: 0 } }],
+        CACHE_HEADERS,
+      );
+      return { data: null };
+    });
+
+    const actual = await proxy(requestTo("/records/12"));
+
+    expect(actual.headers.get("location")).toBeNull();
+    expect(actual.cookies.get("sb-test-auth-token")).toMatchObject({
+      value: "",
+      maxAge: 0,
+    });
+    expect(actual.headers.get("cache-control")).toBe(
+      CACHE_HEADERS["Cache-Control"],
+    );
+  });
 
   test("ログインしている場合は、新しくした JWT の Cookie を付けてページへ通すこと", async () => {
     onGetClaims.mockImplementation(async (cookies: CookieMethods) => {

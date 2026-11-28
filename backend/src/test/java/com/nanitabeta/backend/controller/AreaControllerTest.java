@@ -1,11 +1,13 @@
 package com.nanitabeta.backend.controller;
 
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nanitabeta.backend.config.SecurityConfig;
@@ -56,5 +58,20 @@ class AreaControllerTest {
             """));
 
     verify(service, times(1)).searchRegionDetailList();
+  }
+
+  @Test
+  void エリアの一覧取得_JWTが付いていなくてもエリアの一覧が返り途中で保存されないこと() throws Exception {
+    // 記録の詳細でエリアの名前を出すので、ログインしていない人にも返す
+    Region kanto = new Region(2L, "関東");
+    List<Area> areaList = List.of(new Area(13L, 2L, "東京都"));
+    when(service.searchRegionDetailList()).thenReturn(List.of(new RegionDetail(kanto, areaList)));
+
+    mockMvc.perform(get("/api/areas")).andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", containsString("no-store")))
+        .andExpect(content().json("""
+            [{"region": {"id": 2, "regionName": "関東"},
+              "areaList": [{"id": 13, "regionId": 2, "areaName": "東京都"}]}]
+            """));
   }
 }

@@ -37,7 +37,11 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
 
   const path = request.nextUrl.pathname;
-  const isPublic = path === "/login" || path.startsWith("/auth/");
+  // ログインしていなくても開ける画面：ログイン、ログインの戻り先（/auth/…）、記録の詳細（/records/{数字}）
+  const isPublic =
+    path === "/login" ||
+    path.startsWith("/auth/") ||
+    /^\/records\/\d+$/.test(path);
   if (!data && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

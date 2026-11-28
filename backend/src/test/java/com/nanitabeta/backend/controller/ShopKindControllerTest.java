@@ -1,11 +1,13 @@
 package com.nanitabeta.backend.controller;
 
 import static com.nanitabeta.backend.controller.TestUsers.registeredUser;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nanitabeta.backend.config.SecurityConfig;
@@ -48,5 +50,17 @@ class ShopKindControllerTest {
             """));
 
     verify(service, times(1)).searchShopKindList();
+  }
+
+  @Test
+  void 業態の一覧取得_JWTが付いていなくても業態の一覧が返り途中で保存されないこと() throws Exception {
+    // タイムラインの絞り込みで使うので、ログインしていない人にも返す
+    when(service.searchShopKindList()).thenReturn(List.of(new ShopKind(1L, "コンビニ", "🏪")));
+
+    mockMvc.perform(get("/api/shop-kinds")).andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", containsString("no-store")))
+        .andExpect(content().json("""
+            [{"id": 1, "shopKindName": "コンビニ", "shopKindEmoji": "🏪"}]
+            """));
   }
 }

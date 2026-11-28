@@ -11,7 +11,7 @@ import {
 
 export default async function NewRecordPage() {
   // 未登録なら、写真を選んだりアップロードしたりする前に、初回登録へ案内する
-  const me = await searchMe();
+  const me = await searchMe({ allowGuest: false });
   if (!me) {
     redirect("/signup");
   }

@@ -44,6 +44,7 @@
   --color-category-soft: var(--category-soft);
   --color-shop-kind: var(--shop-kind);
   --color-shop-kind-soft: var(--shop-kind-soft);
+  --color-seasonal-soft: var(--seasonal-soft);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -79,6 +80,8 @@
   --category-soft: #fff1e6;
   --shop-kind: #2f8f83;
   --shop-kind-soft: #e6f4f1;
+  /* 記録の詳細の「季節限定」のバッジの地（若葉色）。分類のオレンジと見分けるため。意味は文字で伝え、色は補助 */
+  --seasonal-soft: #e6f3e8;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -119,6 +122,7 @@
   --category-soft: #33251a;
   --shop-kind: #5cc4b5;
   --shop-kind-soft: #18302c;
+  --seasonal-soft: #22332a;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

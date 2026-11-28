@@ -1,4 +1,9 @@
-import { ApiError, apiFetch } from "./client";
+import {
+  ApiError,
+  apiFetch,
+  publicApiFetch,
+  type PublicApiResult,
+} from "./client";
 import type {
   RecordDetail,
   RecordInput,
@@ -25,6 +30,22 @@ export function searchRecord(id: number) {
 export async function findRecord(id: number) {
   try {
     return await searchRecord(id);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// だれでも見られる記録の詳細を取りに行く（ログインしていなくてもよい。記録の詳細の画面で使う）
+// 見つからない（404）ときだけ null を返し、それ以外の失敗はそのまま投げる（エラーの画面になる）
+// isGuest は、ログインしていない人として読んだか（画面が、本人の操作を出すかを決めるのに使う）
+export async function findPublicRecord(
+  id: number,
+): Promise<PublicApiResult<RecordDetail> | null> {
+  try {
+    return await publicApiFetch<RecordDetail>(`/api/records/${id}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null;
